@@ -89,3 +89,47 @@ test('createDecider: local backend falls back to mock on client error', async ()
   assert.equal(st.backend, 'local');
   assert.match(st.lastError, /Connection refused/);
 });
+
+test('createDecider: jev backend falls back to mock on rate limit cap', async () => {
+  let callCount = 0;
+  const fakeJevClient = async () => {
+    callCount++;
+    return {
+      ...fixture,
+      answers: {
+        ...fixture.answers,
+        wants_to_learn: { type: 'noul', noul: 0.1 },
+      },
+    };
+  };
+
+  const cfg = {
+    decision: {
+      backend: 'jev',
+      timeoutMs: 1000,
+      jev: {
+        baseUrl: 'https://api.jev.ai',
+        apiKey: 'secret',
+        maxCallsPerMin: 2,
+      },
+    },
+  };
+
+  const decider = createDecider(cfg, { client: fakeJevClient });
+  const q = questions.intent();
+
+  // Call 1 & 2 succeed
+  const r1 = await decider.decide({ player_message: 'get wood' }, q);
+  const r2 = await decider.decide({ player_message: 'get wood' }, q);
+  assert.equal(r1.fallback, false);
+  assert.equal(r2.fallback, false);
+  assert.equal(callCount, 2);
+
+  // Call 3 exceeds maxCallsPerMin (2), triggers mock fallback without calling client
+  const r3 = await decider.decide({ player_message: 'get wood' }, q);
+  assert.equal(r3.fallback, true);
+  assert.equal(r3.answers.intent.choice, 'get_wood');
+  assert.equal(callCount, 2);
+  assert.equal(decider.status().lastError, 'rate_limit_cap');
+});
+

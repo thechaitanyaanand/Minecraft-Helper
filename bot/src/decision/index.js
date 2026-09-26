@@ -33,6 +33,8 @@ function createDecider(cfg, injected = {}) {
 
   let lastLatencyMs = 0;
   let lastError = null;
+  const jevCallTimestamps = [];
+  const maxCallsPerMin = cfg.decision.jev?.maxCallsPerMin || 30;
 
   /**
    * Decide action based on state and questions.
@@ -45,23 +47,41 @@ function createDecider(cfg, injected = {}) {
     let answers = null;
     let fallback = false;
 
-    if (backend === 'mock' || !client) {
-      const res = await mockDecide(state, questions);
-      answers = res.answers;
-      lastLatencyMs = Math.max(1, Date.now() - t0);
-    } else {
-      try {
-        const raw = await client(state, questions);
-        answers = normalize(raw, questions);
-        lastLatencyMs = Math.max(1, Date.now() - t0);
-        lastError = null;
-      } catch (err) {
-        log.warn(`Decision backend (${backend}) failed, falling back to mock:`, err.message);
-        lastError = err.message;
+    if (backend === 'jev' && client) {
+      const now = Date.now();
+      while (jevCallTimestamps.length > 0 && now - jevCallTimestamps[0] > 60000) {
+        jevCallTimestamps.shift();
+      }
+      if (jevCallTimestamps.length >= maxCallsPerMin) {
+        log.warn(`Jev per-minute rate limit cap reached (${jevCallTimestamps.length}/${maxCallsPerMin}), using mock fallback`);
+        lastError = 'rate_limit_cap';
         fallback = true;
         const res = await mockDecide(state, questions);
         answers = res.answers;
         lastLatencyMs = Math.max(1, Date.now() - t0);
+      }
+    }
+
+    if (!answers) {
+      if (backend === 'mock' || !client) {
+        const res = await mockDecide(state, questions);
+        answers = res.answers;
+        lastLatencyMs = Math.max(1, Date.now() - t0);
+      } else {
+        try {
+          if (backend === 'jev') jevCallTimestamps.push(Date.now());
+          const raw = await client(state, questions);
+          answers = normalize(raw, questions);
+          lastLatencyMs = Math.max(1, Date.now() - t0);
+          lastError = null;
+        } catch (err) {
+          log.warn(`Decision backend (${backend}) failed, falling back to mock:`, err.message);
+          lastError = err.message;
+          fallback = true;
+          const res = await mockDecide(state, questions);
+          answers = res.answers;
+          lastLatencyMs = Math.max(1, Date.now() - t0);
+        }
       }
     }
 

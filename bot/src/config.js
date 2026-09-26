@@ -61,6 +61,7 @@ const config = Object.freeze({
       apiKey: jevApiKey,
       model: process.env.JEV_MODEL || '',
       authHeader: process.env.JEV_AUTH_HEADER || 'Authorization',
+      maxCallsPerMin: parseNumber(process.env.JEV_MAX_CALLS_PER_MIN, 30, 'JEV_MAX_CALLS_PER_MIN'),
     }),
   }),
   webPort: parseNumber(process.env.WEB_PORT, 3000, 'WEB_PORT'),

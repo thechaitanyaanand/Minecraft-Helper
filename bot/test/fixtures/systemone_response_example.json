@@ -1,0 +1,25 @@
+{
+  "model": "decider-2b-v11",
+  "answers": {
+    "intent": {
+      "type": "choice",
+      "choice": "get_wood",
+      "confidence": 0.9342,
+      "x_p_max": 0.9562,
+      "certainty": 0.8249,
+      "probabilities": {
+        "unclear": 0.0402,
+        "get_food": 0.0036,
+        "get_wood": 0.9562
+      }
+    },
+    "danger": {
+      "type": "noul",
+      "noul": 0.1408
+    }
+  },
+  "usage": {
+    "input_tokens": 123,
+    "output_tokens": 0
+  }
+}

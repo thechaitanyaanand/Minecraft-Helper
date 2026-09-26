@@ -1,0 +1,15 @@
+server-ip=127.0.0.1
+server-port=25565
+online-mode=false
+enforce-secure-profile=false
+white-list=true
+enforce-whitelist=true
+spawn-protection=0
+difficulty=easy
+gamemode=survival
+max-players=5
+view-distance=8
+simulation-distance=8
+motd=Newbie Copilot Dev
+level-seed=copilot-dev-1
+allow-flight=true

@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Helper — Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --gui: #c6c6c6; --gui-hi: #ffffff; --gui-lo: #555555; --gui-text: #3f3f3f;
+    --slot: #8b8b8b; --slot-hi: #ffffff; --slot-lo: #373737;
+    --yellow: #ffff55; --green: #80ff20; --red: #ff5555; --aqua: #55ffff; --gray: #aaaaaa;
+    --pixel: "Press Start 2P", ui-monospace, monospace;
+    --body: "VT323", ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html { background: #1d1d1d; }
+  body {
+    margin: 0; color: #fff; font: 22px/1.15 var(--body);
+    background-color: #2b2b2b; background-size: 64px 64px; image-rendering: pixelated;
+    min-height: 100vh;
+  }
+  canvas, .sprite { image-rendering: pixelated; }
+
+  /* ---------- header: grass + dirt ---------- */
+  header {
+    position: relative; padding: 28px 16px 48px; text-align: center; overflow: hidden;
+    background-size: 64px 64px; border-bottom: 4px solid #000;
+    box-shadow: inset 0 -8px 0 rgba(0,0,0,.25);
+  }
+  header::before {  /* grass lip */
+    content: ""; position: absolute; left: 0; right: 0; top: 0; height: 16px;
+    background: var(--grass-img) 0 0 / 64px 64px; box-shadow: 0 4px 0 rgba(0,0,0,.2);
+  }
+  .logo {
+    position: relative; display: inline-block; margin: 8px 0 0;
+    font: clamp(26px, 6vw, 56px)/1 var(--pixel); letter-spacing: 2px; color: #d9d9d9;
+    text-shadow: 4px 4px 0 #3a3a3a, 0 -2px 0 #fff;
+  }
+  .logo small { display: block; margin-top: 12px; font-size: .28em; color: #e7e7e7; letter-spacing: 4px; text-shadow: 2px 2px 0 #3a3a3a; }
+  .splash {
+    position: absolute; right: 0; top: 100%; margin-top: 10px; transform-origin: right center; transform: rotate(-8deg);
+    font: 12px var(--pixel); color: var(--yellow); text-shadow: 2px 2px 0 #3f3f15; white-space: nowrap;
+    animation: splash .5s ease-in-out infinite alternate;
+  }
+  @keyframes splash { to { transform: rotate(-8deg) scale(1.08); } }
+  @media (prefers-reduced-motion: reduce) { .splash { animation: none; } }
+  .conn {
+    position: absolute; top: 24px; right: 16px; font: 10px var(--pixel); padding: 6px 8px;
+    background: rgba(0,0,0,.55); border: 2px solid #000; text-shadow: 2px 2px 0 #000;
+  }
+  .conn.ok { color: var(--green); } .conn.bad { color: var(--red); } .conn.wait { color: var(--yellow); }
+
+  /* ---------- layout ---------- */
+  main {
+    max-width: 1280px; margin: 0 auto; padding: 20px 16px 40px;
+    display: grid; gap: 18px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr));
+  }
+  .wide { grid-column: 1 / -1; }
+  @media (min-width: 1000px) {
+    main { grid-template-columns: 340px 1fr 1fr; }
+    .span2 { grid-column: span 2; }
+  }
+
+  /* ---------- Minecraft GUI panel ---------- */
+  .panel {
+    background: var(--gui); color: var(--gui-text); padding: 14px;
+    border: 3px solid #000;
+    box-shadow: inset 3px 3px 0 var(--gui-hi), inset -3px -3px 0 var(--gui-lo);
+    min-width: 0;
+  }
+  .panel h2 { margin: 0 0 12px; font: 11px/1.4 var(--pixel); color: var(--gui-text); letter-spacing: 1px; }
+  .inset {
+    background: var(--slot); padding: 10px;
+    box-shadow: inset 2px 2px 0 var(--slot-lo), inset -2px -2px 0 var(--slot-hi);
+  }
+  .dark {  /* chat-style translucent black */
+    background: rgba(0,0,0,.72); color: #fff; padding: 10px 12px;
+    box-shadow: inset 2px 2px 0 #000, inset -2px -2px 0 #3a3a3a;
+  }
+  .shadow { text-shadow: 2px 2px 0 #3f3f3f; }
+  .muted { color: var(--gray); }
+
+  /* ---------- vitals ---------- */
+  .bar-row { display: flex; gap: 2px; margin: 4px 0 10px; flex-wrap: wrap; }
+  .bar-row canvas { width: 22px; height: 22px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; font-size: 22px; }
+  .kv dt { color: #2b2b2b; text-shadow: none; } .kv dd { margin: 0; overflow-wrap: anywhere; }
+  .daybar { height: 10px; margin: 6px 0 2px; position: relative;
+    background: linear-gradient(90deg, #4a90d9 0 50%, #e08a3a 50% 54%, #14173a 54% 96%, #e0a060 96%);
+    box-shadow: inset 0 0 0 2px #000; }
+  .daybar i { position: absolute; top: -3px; width: 4px; height: 16px; background: #fff; box-shadow: 0 0 0 2px #000; }
+
+  /* ---------- decision ---------- */
+  .decision-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: baseline; margin-bottom: 10px; }
+  .chip { font: 9px/1 var(--pixel); padding: 5px 6px; color: #fff; background: #3a3a3a; text-shadow: 1px 1px 0 #000; box-shadow: inset 0 0 0 2px #000; }
+  .chip.local { background: #2a6b2a; } .chip.jev { background: #5b2a8a; } .chip.mock { background: #6b5a2a; }
+  .chip.warn { background: #8a2a2a; }
+  .q { margin: 10px 0 14px; }
+  .q-title { display: flex; justify-content: space-between; gap: 8px; font-size: 24px; }
+  .q-title b { color: var(--yellow); font-weight: normal; }
+  .prob { display: grid; grid-template-columns: minmax(90px, 30%) 1fr 52px; gap: 8px; align-items: center; font-size: 20px; margin: 3px 0; }
+  .prob .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .xp { height: 12px; background: #1f1f1f; box-shadow: inset 0 0 0 2px #000; position: relative; }
+  .xp > span { position: absolute; inset: 2px auto 2px 2px; background: linear-gradient(#b8ff5a, #58c01c); max-width: calc(100% - 4px); }
+  .prob.top .name { color: var(--green); }
+  .prob .pct { text-align: right; color: #ddd; }
+  .empty { text-align: center; padding: 26px 10px; color: var(--gray); }
+  .empty .big { font: 11px/1.8 var(--pixel); color: #fff; margin-bottom: 8px; }
+
+  .history { list-style: none; margin: 0; padding: 0; max-height: 330px; overflow-y: auto; }
+  .history li { display: grid; grid-template-columns: 64px 1fr auto; gap: 8px; padding: 3px 0; border-bottom: 2px solid rgba(255,255,255,.06); font-size: 20px; }
+  .history .t { color: var(--gray); }
+
+  /* ---------- minimap ---------- */
+  .map-wrap { position: relative; }
+  #map { width: 100%; aspect-ratio: 1; display: block; box-shadow: 0 0 0 3px #000; background: #111; }
+  .legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; font-size: 18px; color: var(--gui-text); }
+  .legend i { display: inline-block; width: 10px; height: 10px; margin-right: 4px; box-shadow: 0 0 0 2px #000; }
+
+  /* ---------- inventory ---------- */
+  .slots { display: grid; grid-template-columns: repeat(9, minmax(0, 44px)); gap: 4px; justify-content: start; }
+  .slot {
+    position: relative; aspect-ratio: 1; background: var(--slot);
+    box-shadow: inset 2px 2px 0 var(--slot-lo), inset -2px -2px 0 var(--slot-hi);
+  }
+  .slot canvas { position: absolute; inset: 15%; width: 70%; height: 70%; }
+  .slot .n { position: absolute; right: 3px; bottom: 0; font-size: 20px; color: #fff; text-shadow: 2px 2px 0 #3f3f3f; }
+  .slot.held { box-shadow: inset 0 0 0 3px #fff, inset 2px 2px 0 var(--slot-lo); }
+  .slot:hover { background: #a5a5a5; }
+  .slot[data-name]:hover::after {  /* Minecraft tooltip */
+    content: attr(data-name); position: absolute; left: 70%; bottom: 80%; z-index: 5; white-space: nowrap;
+    padding: 4px 8px; font-size: 20px; color: #fff; background: #100010f0;
+    box-shadow: inset 0 0 0 2px #2d0a63, 0 0 0 2px #100010;
+  }
+
+  /* ---------- chat ---------- */
+  .chat { height: 360px; overflow-y: auto; font-size: 21px; display: flex; flex-direction: column; gap: 2px; }
+  .chat div { text-shadow: 2px 2px 0 #3f3f3f; overflow-wrap: anywhere; }
+  .chat .ev { color: var(--yellow); }
+  .chat .cmd { color: var(--gray); }
+  .chat .bad { color: var(--red); }
+  .chat .me b { color: var(--aqua); font-weight: normal; }
+  .chat time { color: #777; margin-right: 6px; }
+
+  footer { text-align: center; padding: 0 16px 28px; font-size: 18px; color: #8a8a8a; }
+</style>
+</head>
+<body>
+<header>
+  <span id="conn" class="conn wait">CONNECTING</span>
+  <div class="logo">HELPER<small>LIVE FROM YOUR WORLD</small><span class="splash" id="splash">Now with calibrated probabilities!</span></div>
+</header>
+
+<main>
+  <!-- Vitals -->
+  <section class="panel" aria-labelledby="h-vitals">
+    <h2 id="h-vitals">HELPER</h2>
+    <div class="inset">
+      <div id="hearts" class="bar-row" role="img" aria-label="Health"></div>
+      <div id="hunger" class="bar-row" role="img" aria-label="Hunger"></div>
+      <dl class="kv shadow" style="color:#fff">
+        <dt>Doing</dt><dd id="activity">—</dd>
+        <dt>XYZ</dt><dd id="pos">—</dd>
+        <dt>Time</dt><dd id="time">—</dd>
+        <dt>Holding</dt><dd id="held">—</dd>
+        <dt>Owner</dt><dd id="owner">—</dd>
+        <dt>Brain</dt><dd id="backend">—</dd>
+      </dl>
+      <div class="daybar" aria-hidden="true"><i id="daypin"></i></div>
+    </div>
+  </section>
+
+  <!-- Current decision -->
+  <section class="panel span2" aria-labelledby="h-dec">
+    <h2 id="h-dec">LATEST DECISION</h2>
+    <div class="dark" id="decision">
+      <div class="empty"><div class="big">NO DECISIONS YET</div>Ask the helper something in game, e.g. <b>helper get wood</b>. Decisions appear here the moment they are made.</div>
+    </div>
+  </section>
+
+  <!-- Minimap -->
+  <section class="panel" aria-labelledby="h-map">
+    <h2 id="h-map">MAP</h2>
+    <div class="map-wrap"><canvas id="map" width="250" height="250" aria-label="Top-down map around the helper"></canvas></div>
+    <div class="legend">
+      <span><i style="background:#fff"></i>Helper</span><span><i style="background:#55ffff"></i>You</span>
+      <span><i style="background:#5555ff"></i>Player</span><span><i style="background:#ff5555"></i>Hostile</span><span><i style="background:#ffaaff"></i>Animal</span>
+    </div>
+  </section>
+
+  <!-- Chat -->
+  <section class="panel" aria-labelledby="h-chat">
+    <h2 id="h-chat">CHAT</h2>
+    <div class="dark chat" id="chat" aria-live="polite"></div>
+  </section>
+
+  <!-- History -->
+  <section class="panel" aria-labelledby="h-hist">
+    <h2 id="h-hist">DECISION HISTORY</h2>
+    <div class="dark"><ul class="history" id="history"><li class="muted"><span></span><span>Nothing yet</span><span></span></li></ul></div>
+  </section>
+
+  <!-- Inventory -->
+  <section class="panel wide" aria-labelledby="h-inv">
+    <h2 id="h-inv">INVENTORY</h2>
+    <div class="slots" id="slots"></div>
+  </section>
+</main>
+<footer>Streaming from the bot at this address · only reachable from this PC</footer>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+
+/* ---------- procedural textures (no image files) ---------- */
+function rng(seed) { return () => (seed = (seed * 16807) % 2147483647) / 2147483647; }
+function texture(palette, seed, size = 16) {
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  const g = c.getContext('2d'), r = rng(seed);
+  for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) {
+    g.fillStyle = palette[Math.floor(r() * palette.length)]; g.fillRect(x, y, 1, 1);
+  }
+  return c.toDataURL();
+}
+const stone = texture(['#2e2e2e', '#333', '#292929', '#363636', '#303030', '#262626'], 7);
+const dirt = texture(['#6b4a30', '#5d3f28', '#79553a', '#4f3522', '#6f4d33'], 11);
+const grass = texture(['#5b8c32', '#6aa33a', '#4f7d2b', '#76b043', '#5f9536'], 3);
+document.body.style.backgroundImage = `url(${stone})`;
+document.querySelector('header').style.backgroundImage = `url(${dirt})`;
+document.documentElement.style.setProperty('--grass-img', `url(${grass})`);
+
+/* ---------- pixel sprites ---------- */
+function sprite(rows, colors, px = 1) {
+  const h = rows.length, w = rows[0].length;
+  const c = document.createElement('canvas'); c.width = w * px; c.height = h * px;
+  const g = c.getContext('2d');
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (colors[ch]) { g.fillStyle = colors[ch]; g.fillRect(x * px, y * px, px, px); }
+  }));
+  return c;
+}
+const HEART = ['.kk.kk.', 'kffkffk', 'kfffffk', 'kfffffk', '.kfffk.', '..kfk..', '...k...'];
+const HEART_HALF = ['.kk.kk.', 'kffkeek', 'kffeeek', 'kffeeek', '.kffek.', '..kfk..', '...k...'];
+const FOOD = ['...kkk.', '..kfffk', '.kffffk', '.kfffk.', 'kbkkk..', 'bk.....', 'k......'];
+const FOOD_HALF = ['...kkk.', '..keeek', '.kfeeek', '.kffek.', 'kbkkk..', 'bk.....', 'k......'];
+function bar(el, value, full, half, fillColor, label) {
+  el.textContent = ''; el.setAttribute('aria-label', `${label} ${value} of 20`);
+  for (let i = 0; i < 10; i++) {
+    const v = value - i * 2;
+    const rows = v >= 2 ? full : v === 1 ? half : full;
+    const colors = { k: '#000', b: '#e8e0c8', e: '#3a1c1c', f: v >= 1 ? fillColor : '#3a1c1c' };
+    el.appendChild(sprite(rows, colors));
+  }
+}
+
+/* ---------- colours for blocks / items ---------- */
+const COLORS = [
+  [/water/, '#3f6fd8'], [/lava/, '#e5621b'], [/grass_block/, '#5b8c32'], [/leaves/, '#3f7a2a'],
+  [/birch_log|birch_wood/, '#d7d3c7'], [/spruce_log|dark_oak_log/, '#3d2a17'], [/_log|_wood/, '#6b5230'],
+  [/planks|crafting_table|stick|_door|_fence/, '#a88754'], [/dirt|farmland|mud|podzol/, '#866043'],
+  [/sand/, '#dbcfa3'], [/gravel/, '#837e7c'], [/snow|powder/, '#f5f9f9'], [/ice/, '#a5c3f5'],
+  [/coal/, '#2b2b2b'], [/iron/, '#d8af93'], [/gold/, '#fcee4b'], [/diamond/, '#4ae3d6'], [/redstone/, '#b01515'],
+  [/diorite|quartz/, '#cfcfcf'], [/granite/, '#9a6b58'], [/deepslate|tuff|basalt/, '#505050'],
+  [/cobble|stone|andesite|furnace/, '#7f7f7f'], [/clay/, '#a0a6b3'], [/wool|bed/, '#e8e8e8'],
+  [/beef|porkchop|mutton|chicken|rabbit|cod|salmon/, '#d0574a'], [/apple|poppy|rose/, '#d8352b'],
+  [/bread|wheat|hay|carrot|potato/, '#d9a634'], [/short_grass|tall_grass|fern|vine|flower|dandelion|bush|kelp|seagrass/, '#6aa33a'],
+  [/torch|glowstone/, '#ffd35a'],
+];
+function colorOf(name) { for (const [re, c] of COLORS) if (re.test(name)) return c; return '#9a9a9a'; }
+const TIER = { wooden: '#8b6a3e', stone: '#8a8a8a', iron: '#e6e6e6', golden: '#fcee4b', diamond: '#4ae3d6', netherite: '#4a4043' };
+const TOOLS = {
+  pickaxe: ['.hhhhh..', 'h....hh.', '....s.h.', '...s..h.', '..s.....', '.s......', 's.......', '........'],
+  axe: ['...hh...', '..hhhh..', '..hhs...', '...s....', '..s.....', '.s......', 's.......', '........'],
+  sword: ['.......h', '......hh', '.....hh.', '....hh..', '.s.hh...', '..ss....', '.s.s....', 's.......'],
+  shovel: ['.....hh.', '....hhh.', '.....hh.', '....s...', '...s....', '..s.....', '.s......', 's.......'],
+  hoe: ['..hhhh..', '.....s..', '....s...', '...s....', '..s.....', '.s......', 's.......', '........'],
+};
+const STICK = ['.......s', '......s.', '.....s..', '....s...', '...s....', '..s.....', '.s......', 's.......'];
+function itemIcon(name) {
+  const m = name.match(/^(wooden|stone|iron|golden|diamond|netherite)_(pickaxe|axe|sword|shovel|hoe)$/);
+  if (m) return sprite(TOOLS[m[2]], { h: TIER[m[1]], s: '#6b4f2a' });
+  if (name === 'stick') return sprite(STICK, { s: '#8b6a3e' });
+  if (/beef|porkchop|mutton|chicken|rabbit/.test(name)) return sprite(FOOD, { k: '#3a1a12', f: colorOf(name), b: '#e8e0c8' });
+  // blocks & everything else: a little textured cube face
+  const base = colorOf(name);
+  const c = document.createElement('canvas'); c.width = c.height = 8;
+  const g = c.getContext('2d'), r = rng([...name].reduce((a, ch) => a + ch.charCodeAt(0), 1));
+  for (let y = 0; y < 8; y++) for (let x = 0; x < 8; x++) {
+    g.fillStyle = base; g.fillRect(x, y, 1, 1);
+    g.fillStyle = `rgba(${r() > .5 ? '255,255,255' : '0,0,0'},${(r() * .22).toFixed(2)})`; g.fillRect(x, y, 1, 1);
+  }
+  if (/_log/.test(name)) { g.fillStyle = 'rgba(0,0,0,.35)'; for (let x = 1; x < 8; x += 3) g.fillRect(x, 0, 1, 8); }
+  if (/planks/.test(name)) { g.fillStyle = 'rgba(0,0,0,.3)'; for (let y = 1; y < 8; y += 3) g.fillRect(0, y, 8, 1); }
+  g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, 7, 8, 1); g.fillRect(7, 0, 1, 8);
+  return c;
+}
+const pretty = (s) => String(s).replace(/_/g, ' ');
+
+/* ---------- renderers ---------- */
+let lastMap = null;
+function renderSnapshot(s) {
+  const conn = $('conn');
+  if (!s.online) { conn.className = 'conn bad'; conn.textContent = 'BOT OFFLINE'; }
+  else { conn.className = 'conn ok'; conn.textContent = 'LIVE'; }
+  $('activity').textContent = s.activity ? pretty(s.activity) : '—';
+  $('backend').textContent = s.backend || '—';
+  if (!s.online) return;
+
+  bar($('hearts'), s.health, HEART, HEART_HALF, '#e0241b', 'Health');
+  bar($('hunger'), s.food, FOOD, FOOD_HALF, '#b86a2c', 'Hunger');
+  $('pos').textContent = `${s.pos.x} / ${s.pos.y} / ${s.pos.z}`;
+  const hours = Math.floor((s.timeOfDay / 1000 + 6) % 24), mins = Math.floor((s.timeOfDay % 1000) * 0.06);
+  $('time').textContent = `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')} · ${s.time}`;
+  $('daypin').style.left = `calc(${(s.timeOfDay / 24000) * 100}% - 2px)`;
+  $('held').textContent = s.held ? pretty(s.held) : 'empty hand';
+  const own = s.entities.find((e) => e.kind === 'owner');
+  $('owner').textContent = own ? `${s.owner} · ${Math.round(Math.hypot(own.dx, own.dz))} blocks away` : `${s.owner} · out of sight`;
+
+  renderInventory(s.inventory, s.held);
+  if (s.map) lastMap = s.map;
+  renderMap(lastMap, s.entities, s.yaw);
+}
+
+function renderInventory(items, held) {
+  const slots = $('slots'); slots.textContent = '';
+  for (let i = 0; i < 36; i++) {
+    const it = items[i], d = document.createElement('div');
+    d.className = 'slot';
+    if (it) {
+      d.dataset.name = `${pretty(it.name)} ×${it.count}`;
+      if (it.name === held) d.classList.add('held');
+      d.appendChild(itemIcon(it.name));
+      if (it.count > 1) { const n = document.createElement('span'); n.className = 'n'; n.textContent = it.count; d.appendChild(n); }
+    }
+    slots.appendChild(d);
+  }
+}
+
+function renderMap(map, entities, yaw) {
+  const cv = $('map'), g = cv.getContext('2d');
+  if (!map) return;
+  const n = map.length, cell = cv.width / n, mid = (n - 1) / 2;
+  map.forEach((row, z) => row.forEach((name, x) => {
+    g.fillStyle = name ? colorOf(name) : '#111'; g.fillRect(x * cell, z * cell, cell, cell);
+  }));
+  const dot = { owner: '#55ffff', player: '#5555ff', hostile: '#ff5555', mob: '#ffaaff' };
+  for (const e of entities) {
+    const x = (mid + e.dx) * cell, y = (mid + e.dz) * cell;
+    g.fillStyle = '#000'; g.fillRect(x + 1, y + 1, cell - 2, cell - 2);
+    g.fillStyle = dot[e.kind]; g.fillRect(x + 2, y + 2, cell - 4, cell - 4);
+  }
+  // helper: white arrow pointing where it looks (mineflayer yaw 0 = facing -z / north)
+  const cx = (mid + .5) * cell, cy = (mid + .5) * cell;
+  g.save(); g.translate(cx, cy); g.rotate(-yaw);
+  g.fillStyle = '#000'; g.beginPath(); g.moveTo(0, -cell); g.lineTo(cell * .75, cell * .8); g.lineTo(-cell * .75, cell * .8); g.fill();
+  g.fillStyle = '#fff'; g.beginPath(); g.moveTo(0, -cell + 3); g.lineTo(cell * .5, cell * .55); g.lineTo(-cell * .5, cell * .55); g.fill();
+  g.restore();
+}
+
+function hhmm(ts) { const d = ts ? new Date(ts) : new Date(); return d.toTimeString().slice(0, 8); }
+function chatLine(cls, html) {
+  const box = $('chat'), stick = box.scrollTop + box.clientHeight >= box.scrollHeight - 30;
+  const d = document.createElement('div'); d.className = cls; d.innerHTML = html;
+  box.appendChild(d);
+  while (box.children.length > 200) box.firstChild.remove();
+  if (stick) box.scrollTop = box.scrollHeight;
+}
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+function renderDecision(d) {
+  const answers = d.answers || {};
+  const meta = d.meta || {};
+  const chips = [
+    `<span class="chip ${esc(d.backend || '')}">${esc((d.backend || '?').toUpperCase())}</span>`,
+    d.fallback ? '<span class="chip warn">FALLBACK</span>' : '',
+    d.override ? '<span class="chip warn">SAFETY OVERRIDE</span>' : '',
+    Number.isFinite(d.latencyMs) ? `<span class="chip">${Math.round(d.latencyMs)} MS</span>` : '',
+  ].join('');
+  let html = `<div class="decision-head"><span style="font-size:26px;color:var(--yellow)">${esc(pretty(meta.purpose || 'decision'))}</span>${chips}<span class="muted" style="margin-left:auto">${hhmm(d.ts)}</span></div>`;
+  if (meta.goal) html += `<div class="muted">goal: ${esc(pretty(meta.goal))}</div>`;
+
+  for (const [id, a] of Object.entries(answers)) {
+    html += '<div class="q">';
+    if (a.type === 'choice' || a.type === 'score') {
+      const pick = a.type === 'choice' ? a.choice : a.score;
+      const agree = meta.heuristicPick && a.type === 'choice'
+        ? (meta.heuristicPick === a.choice ? ' <span class="muted">· rule agrees</span>' : ` <span style="color:var(--red)">· rule said ${esc(pretty(meta.heuristicPick))}</span>`) : '';
+      html += `<div class="q-title"><span>${esc(pretty(id))} → <b>${esc(pretty(pick))}</b>${agree}</span><span>${Math.round((a.confidence || 0) * 100)}% sure</span></div>`;
+      const probs = Object.entries(a.probabilities || {}).sort((x, y) => y[1] - x[1]).slice(0, 6);
+      for (const [opt, p] of probs) {
+        const label = a.type === 'score' && a.legend ? a.legend[opt] || opt : opt;
+        html += `<div class="prob ${String(opt) === String(pick) ? 'top' : ''}"><span class="name">${esc(pretty(label))}</span><span class="xp"><span style="width:${(p * 100).toFixed(1)}%"></span></span><span class="pct">${Math.round(p * 100)}%</span></div>`;
+      }
+    } else if (a.type === 'noul') {
+      const p = a.p ?? a.noul ?? 0;
+      html += `<div class="q-title"><span>${esc(pretty(id))} → <b>${p >= .5 ? 'yes' : 'no'}</b></span><span>${Math.round(p * 100)}% yes</span></div>`;
+      html += `<div class="prob top"><span class="name">yes</span><span class="xp"><span style="width:${(p * 100).toFixed(1)}%"></span></span><span class="pct">${Math.round(p * 100)}%</span></div>`;
+    }
+    html += '</div>';
+  }
+  if (!Object.keys(answers).length) html += '<div class="muted">No answers in this decision.</div>';
+  $('decision').innerHTML = html;
+
+  const hist = $('history');
+  if (hist.firstElementChild?.classList.contains('muted')) hist.textContent = '';
+  const first = Object.entries(answers)[0];
+  const summary = first ? (first[1].choice ?? first[1].score ?? `${Math.round((first[1].p ?? first[1].noul ?? 0) * 100)}% yes`) : '—';
+  const conf = first && first[1].confidence != null ? `${Math.round(first[1].confidence * 100)}%` : '';
+  const li = document.createElement('li');
+  li.innerHTML = `<span class="t">${hhmm(d.ts)}</span><span>${esc(pretty(meta.purpose || first?.[0] || ''))} → <span style="color:var(--yellow)">${esc(pretty(summary))}</span>${d.fallback ? ' <span style="color:var(--red)">(fallback)</span>' : ''}</span><span class="muted">${conf}</span>`;
+  hist.prepend(li);
+  while (hist.children.length > 50) hist.lastChild.remove();
+}
+
+/* ---------- live stream ---------- */
+const EVENT_CLASS = { command: 'cmd', intent: 'cmd', kicked: 'bad', death: 'bad', disconnect: 'bad' };
+function connect() {
+  const es = new EventSource('/events');
+  es.addEventListener('open', () => { $('chat').textContent = ''; });
+  es.addEventListener('snapshot', (e) => renderSnapshot(JSON.parse(e.data)));
+  es.addEventListener('decision', (e) => renderDecision(JSON.parse(e.data)));
+  es.addEventListener('chat', (e) => {
+    const c = JSON.parse(e.data);
+    chatLine(c.self ? 'me' : '', `<time>${hhmm()}</time>&lt;<b>${esc(c.username)}</b>&gt; ${esc(c.message)}`);
+  });
+  es.addEventListener('event', (e) => {
+    const ev = JSON.parse(e.data);
+    const text = ev.kind === 'intent' ? `→ helper heard: "${ev.text}"` : ev.text;
+    chatLine(EVENT_CLASS[ev.kind] || 'ev', `<time>${hhmm()}</time>${esc(text)}`);
+  });
+  es.addEventListener('error', () => { const c = $('conn'); c.className = 'conn wait'; c.textContent = 'RECONNECTING'; });
+}
+
+const SPLASHES = ['Now with calibrated probabilities!', 'Punch trees!', 'System one, not system two!', 'Also try: helper get wood', 'Does not write poems!', '100% local!', 'Mind the creepers!'];
+$('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
+renderInventory([], null);
+bar($('hearts'), 0, HEART, HEART_HALF, '#e0241b', 'Health');
+bar($('hunger'), 0, FOOD, FOOD_HALF, '#b86a2c', 'Hunger');
+connect();
+</script>
+</body>
+</html>

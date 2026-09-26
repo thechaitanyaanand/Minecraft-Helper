@@ -9,6 +9,8 @@ const { buildState } = require('../state/buildState');
 const templates = require('../chat/templates');
 const log = require('../log');
 
+const { plan } = require('./obtain');
+
 function createPlanner(bot, decider, config, say) {
   let mode = 'idle'; // 'idle' | 'goal' | 'autopilot'
   let currentGoalId = 'none';
@@ -56,19 +58,16 @@ function createPlanner(bot, decider, config, say) {
       if (legal.length <= 1) return null;
       const q = questions.interrupt(legal);
       if (!q) return null;
-      const res = await decider.decide(state, q, {
-        purpose: 'interrupt', heuristicPick: heuristicInterrupt(state, legal),
-      });
+      const res = await decider.decide(state, q, { purpose: 'interrupt', heuristicPick: heuristicInterrupt(state, legal) });
       chosenAction = res.answers?.interrupt?.choice;
     }
     if (!chosenAction || chosenAction === 'continue_task') return null;
 
     log.warn(`[Planner] Interrupting with action: ${chosenAction}`);
     const actionSkillMap = { eat_food: 'eat', flee: 'flee', fight: 'fight', dig_in: 'dig_in', get_food: 'hunt_food' };
-    const skillName = actionSkillMap[chosenAction] || chosenAction;
-    const skill = getSkill(skillName);
+    const skill = getSkill(actionSkillMap[chosenAction] || chosenAction);
     if (!skill) return null;
-    speak(templates.stepStart(skillName, {}));
+    speak(templates.stepStart(skill.name, {}));
     return await runSkill(skill, bot, makeCtx(), token || currentToken);
   }
 
@@ -77,11 +76,8 @@ function createPlanner(bot, decider, config, say) {
     const available = candidateGoals.filter((id) => {
       const g = GOALS[id];
       if (!g || g.done(bot, makeCtx())) return false;
-      if (id === 'survive_night') {
-        const time = bot?.time?.timeOfDay ?? 6000;
-        return time >= 12000 && time < 23000;
-      }
-      return true;
+      const time = bot?.time?.timeOfDay ?? 6000;
+      return id !== 'survive_night' || (time >= 12000 && time < 23000);
     });
 
     if (available.length === 0) {
@@ -99,27 +95,42 @@ function createPlanner(bot, decider, config, say) {
   }
 
   async function runGoalLoop(goalId, opts = {}, goalToken = currentToken) {
-    const goal = GOALS[goalId];
-    if (!goal) return speak(`Unknown goal: ${goalId}`);
+    const isObtain = goalId.startsWith('obtain:');
+    const [_, tgt, cntStr] = isObtain ? goalId.split(':') : [];
+    const count = parseInt(cntStr || '1', 10);
+    const goal = isObtain ? null : GOALS[goalId];
+    if (!goal && !isObtain) return speak(`Unknown goal: ${goalId}`);
     currentGoalId = goalId;
     let stepCount = 0, retries = 0, lastFailedStep = null;
 
     while (!goalToken.cancelled) {
-      if (goal.done(bot, makeCtx())) {
-        speak(templates.stepDone(goalId, `Completed goal: ${goal.describe}`));
-        if (mode === 'autopilot') {
-          const next = await pickNextGoal();
-          if (next && !goalToken.cancelled) return runGoalLoop(next, { autopilot: true }, goalToken);
-        } else if (goalId === 'get_food') {
-          speak('Delivering food to you now...');
-          await runSkill(getSkill('give_to_owner'), bot, makeCtx(), goalToken);
+      let step = null;
+      if (isObtain) {
+        const inv = {};
+        if (bot?.inventory?.items) for (const it of bot.inventory.items()) inv[it.name] = (inv[it.name] || 0) + it.count;
+        const steps = plan(tgt, count, inv);
+        if (steps.fail) { speak(templates.stepFailed(tgt, steps.fail)); return stop(steps.fail); }
+        if (!steps.length) {
+          speak(templates.stepDone(tgt, `Obtained ${count} ${tgt}`));
+          if (opts.give) await runSkill(getSkill('give_to_owner'), bot, makeCtx(), goalToken);
+          mode = 'idle'; currentGoalId = 'none'; currentStepName = 'none'; return;
         }
-        mode = 'idle'; currentGoalId = 'none'; currentStepName = 'none';
-        return;
+        step = steps[0];
+      } else {
+        if (goal.done(bot, makeCtx())) {
+          speak(templates.stepDone(goalId, `Completed goal: ${goal.describe}`));
+          if (mode === 'autopilot') {
+            const next = await pickNextGoal();
+            if (next && !goalToken.cancelled) return runGoalLoop(next, { autopilot: true }, goalToken);
+          } else if (goalId === 'get_food') {
+            speak('Delivering food to you now...');
+            await runSkill(getSkill('give_to_owner'), bot, makeCtx(), goalToken);
+          }
+          mode = 'idle'; currentGoalId = 'none'; currentStepName = 'none'; return;
+        }
+        step = getFirstNeededStep(goal, bot, makeCtx());
+        if (!step) { mode = 'idle'; return; }
       }
-
-      const step = getFirstNeededStep(goal, bot, makeCtx());
-      if (!step) { mode = 'idle'; return; }
       if (++stepCount > 25) { speak(templates.stepFailed(goalId, 'too_many_steps')); return stop('too_many_steps'); }
 
       await checkInterrupts(goalToken);
@@ -143,7 +154,6 @@ function createPlanner(bot, decider, config, say) {
           return stop('owner_not_found');
         }
         if (lastFailedStep === step.skill) retries++; else { lastFailedStep = step.skill; retries = 1; }
-
         if (retries === 2 && res.reason === 'no_target') {
           speak('Cannot find target nearby — exploring around first...');
           await runSkill(getSkill('explore'), bot, makeCtx(), goalToken, { distance: 30 });
@@ -162,8 +172,7 @@ function createPlanner(bot, decider, config, say) {
     mode = opts.autopilot ? 'autopilot' : 'goal';
     currentGoalId = goalId;
     speak(templates.announceGoal(goalId, opts.learn));
-    const token = currentToken;
-    runGoalLoop(goalId, opts, token).catch((err) => log.error('[Planner] Loop error:', err));
+    runGoalLoop(goalId, opts, currentToken).catch((err) => log.error('[Planner] Loop error:', err));
   }
 
   function startAutopilot() {
@@ -183,7 +192,4 @@ function createPlanner(bot, decider, config, say) {
   };
 }
 
-module.exports = {
-  createPlanner,
-  getLegalInterrupts,
-};
+module.exports = { createPlanner, getLegalInterrupts };

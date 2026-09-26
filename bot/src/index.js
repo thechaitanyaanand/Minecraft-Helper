@@ -18,6 +18,7 @@ const questions = require('./decision/questions');
 const { buildState } = require('./state/buildState');
 const { timeOfDayLabel, checkNames } = require('./state/world');
 const { createPlanner } = require('./planner/loop');
+const { parseDirectTarget, parseAmount } = require('./planner/shortlist');
 
 let bot = null;
 let say = () => {};
@@ -45,33 +46,29 @@ function handleCommand(cmd, rest) {
     case 'why': return say(templates.whyLast(lastDecision));
     case 'status': {
       const pl = planner?.getState?.() || { mode: 'idle' };
-      const act = pl.mode === 'idle' ? 'idle' : `${pl.mode}: ${pl.currentGoal} (${pl.currentStep})`;
-      console.log('[State]', JSON.stringify(buildState(bot, makeCtx(), { purpose: 'status' })));
-      return say(templates.status({ health: Math.round(bot?.health || 20), food: Math.round(bot?.food || 20), timeOfDay: timeOfDayLabel(bot?.time?.timeOfDay ?? 6000), activity: act, backend: decider.status().backend }));
+      return say(templates.status({ health: Math.round(bot?.health || 20), food: Math.round(bot?.food || 20), timeOfDay: timeOfDayLabel(bot?.time?.timeOfDay ?? 6000), activity: pl.mode === 'idle' ? 'idle' : `${pl.mode}: ${pl.currentGoal} (${pl.currentStep})`, backend: decider.status().backend }));
     }
     case 'stop':
       planner?.stop();
       if (pendingQuestion?.timeout) clearTimeout(pendingQuestion.timeout);
       pendingQuestion = null;
       return say('Stopped all actions.');
-    case 'come': return planner?.startGoal('come_here');
-    case 'follow': return planner?.startGoal('follow_me');
-    case 'give': return planner?.startGoal('give_items');
+    case 'come':
+    case 'follow':
+    case 'give': return planner?.startGoal(cmd === 'give' ? 'give_items' : (cmd === 'come' ? 'come_here' : 'follow_me'));
     case 'auto': return planner?.startAutopilot();
     case 'skill': return handleDebugSkill(rest, bot, makeCtx(), new CancelToken(), say);
     case 'yes':
     case 'no': {
       const c = pendingQuestion?.type === 'confirm' ? pendingQuestion.choice : null;
-      if (c) {
-        const top3 = pendingQuestion.top3;
-        clearTimeout(pendingQuestion.timeout);
-        pendingQuestion = null;
-        if (cmd === 'yes') return planner?.startGoal(c);
-        const opts = top3?.length ? top3 : ['get_wood', 'make_tools', 'get_food'];
-        setPending('pick', { options: opts });
-        return say(templates.pickOne(opts));
-      }
-      return say('No confirmation was pending.');
+      if (!c) return say('No confirmation was pending.');
+      const top3 = pendingQuestion.top3;
+      clearTimeout(pendingQuestion.timeout);
+      pendingQuestion = null;
+      if (cmd === 'yes') return planner?.startGoal(c);
+      const opts = top3?.length ? top3 : ['get_wood', 'make_tools', 'get_food'];
+      setPending('pick', { options: opts });
+      return say(templates.pickOne(opts));
     }
     case '1':
     case '2':
@@ -119,6 +116,12 @@ async function handleIntentText(text) {
   if (choice === 'status' || choice === 'stop') return handleCommand(choice, '');
   if (choice === 'autopilot') return planner?.startAutopilot();
   if (choice === 'get_food' && /\bgive\b/i.test(text)) return planner?.startGoal('give_items');
+
+  const mcData = bot?.version ? require('minecraft-data')(bot.version) : null;
+  const target = parseDirectTarget(text, mcData);
+  if (target && !['explain', 'stop', 'status', 'autopilot'].includes(choice)) {
+    return planner?.startGoal(`obtain:${target}:${parseAmount(text)}`, { give: /\bgive\b/i.test(text) });
+  }
 
   if (conf >= config.decision.confAct) return planner?.startGoal(choice, { learn: res.answers.wants_to_learn?.p > 0.6 });
   if (conf >= config.decision.confAsk) { setPending('confirm', { choice, top3 }); return say(templates.didYouMean(choice.replace(/_/g, ' '))); }
@@ -177,18 +180,14 @@ function startLiveView() {
   log.onDecision = (entry) => publish('decision', entry);
   let last = '', tick = 0;
   setInterval(() => {
-    const withMap = tick++ % 4 === 0;
-    let state;
     try {
+      const withMap = tick++ % 4 === 0;
       const pl = planner?.getState?.() || { mode: 'idle' };
       const act = pl.mode === 'idle' ? 'idle' : `${pl.mode}: ${pl.currentGoal}`;
-      state = buildLiveState(bot, { activity: act, backend: decider.status().backend, owner: config.ownerName, withMap });
-    } catch (err) {
-      log.warn('Live view snapshot failed:', err.message);
-      return;
-    }
-    const key = JSON.stringify({ ...state, map: undefined });
-    if (withMap || key !== last) { last = key; publish('snapshot', state); }
+      const state = buildLiveState(bot, { activity: act, backend: decider.status().backend, owner: config.ownerName, withMap });
+      const key = JSON.stringify({ ...state, map: undefined });
+      if (withMap || key !== last) { last = key; publish('snapshot', state); }
+    } catch (err) { log.warn('Live view snapshot failed:', err.message); }
   }, 500);
 }
 

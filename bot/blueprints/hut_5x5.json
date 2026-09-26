@@ -1,0 +1,15 @@
+{
+  "id": "hut_5x5",
+  "description": "small wooden hut with a door, fits 2 players",
+  "key": {
+    "P": "group:planks",
+    "D": "oak_door",
+    ".": "air"
+  },
+  "layers": [
+    ["PPPPP", "PPPPP", "PPPPP", "PPPPP", "PPPPP"],
+    ["PPPPP", "P...P", "P...P", "P...P", "PPDPP"],
+    ["PPPPP", "P...P", "P...P", "P...P", "PP.PP"],
+    ["PPPPP", "PPPPP", "PPPPP", "PPPPP", "PPPPP"]
+  ]
+}

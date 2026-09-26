@@ -23,6 +23,8 @@ const CHECKED_NAMES = Object.freeze([
   'wooden_axe', 'stone_axe', 'iron_axe', 'golden_axe', 'diamond_axe', 'netherite_axe',
   'wooden_sword', 'stone_sword', 'iron_sword', 'golden_sword', 'diamond_sword', 'netherite_sword',
   'stick', 'oak_planks',
+  'cooked_beef', 'cooked_porkchop', 'bread', 'cooked_chicken', 'cooked_mutton',
+  'baked_potato', 'apple', 'carrot', 'beef', 'porkchop', 'mutton', 'chicken', 'rabbit',
 ]);
 
 function timeOfDayLabel(t) {

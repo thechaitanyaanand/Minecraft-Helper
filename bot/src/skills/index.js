@@ -2,6 +2,14 @@
 const collectBlock = require('./collectBlock');
 const craft = require('./craft');
 const placeBlock = require('./placeBlock');
+const hunt = require('./hunt');
+const eat = require('./eat');
+const flee = require('./flee');
+const fight = require('./fight');
+const digIn = require('./digIn');
+const { comeToOwner, followOwner, giveToOwner } = require('./owner');
+const explore = require('./explore');
+const { FOOD_MOBS } = require('../state/world');
 
 const ALL_LOG_NAMES = Object.freeze([
   'oak_log', 'spruce_log', 'birch_log', 'jungle_log',
@@ -12,6 +20,16 @@ const skills = {
   collect_block: collectBlock,
   craft,
   place_block: placeBlock,
+  hunt,
+  eat,
+  flee,
+  fight,
+  dig_in: digIn,
+  digIn,
+  come_to_owner: comeToOwner,
+  follow_owner: followOwner,
+  give_to_owner: giveToOwner,
+  explore,
 };
 
 const aliases = {
@@ -76,6 +94,16 @@ const aliases = {
     timeoutMs: 20_000,
     run: (bot, ctx, token, args = {}) => placeBlock.run(bot, ctx, token, {
       name: 'crafting_table',
+      ...args,
+    }),
+  },
+  hunt_food: {
+    name: 'hunt_food',
+    describe: 'hunt nearby food mobs for meat',
+    timeoutMs: 60_000,
+    isAvailable: (bot, ctx, args) => hunt.isAvailable(bot, ctx, { mobNames: Array.from(FOOD_MOBS), ...args }),
+    run: (bot, ctx, token, args = {}) => hunt.run(bot, ctx, token, {
+      mobNames: Array.from(FOOD_MOBS),
       ...args,
     }),
   },

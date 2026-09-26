@@ -41,7 +41,7 @@ function createRouter({
       return;
     }
 
-    // 4. Check if it starts with one of the prefixes
+    // 4. Check if it starts or ends with one of the prefixes
     for (const prefix of prefixes) {
       if (prefix === '!') continue; // Already handled above
       const pLower = prefix.toLowerCase();
@@ -49,9 +49,16 @@ function createRouter({
         const nextChar = trimmed[pLower.length];
         if (nextChar === undefined || nextChar === ' ' || nextChar === ',' || nextChar === ':') {
           const rest = trimmed.slice(pLower.length).replace(/^[\s,:]+/, '').trim();
-          if (rest && typeof onIntentText === 'function') {
-            onIntentText(rest);
-          }
+          if (rest && typeof onIntentText === 'function') onIntentText(rest);
+          return;
+        }
+      }
+      if (lower.endsWith(pLower)) {
+        const prevIndex = trimmed.length - pLower.length - 1;
+        const prevChar = trimmed[prevIndex];
+        if (prevChar === undefined || prevChar === ' ' || prevChar === ',' || prevChar === ':') {
+          const rest = trimmed.slice(0, prevIndex + 1).replace(/[\s,:]+$/, '').trim();
+          if (rest && typeof onIntentText === 'function') onIntentText(rest);
           return;
         }
       }

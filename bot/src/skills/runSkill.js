@@ -33,11 +33,15 @@ async function runSkill(skill, bot, ctx, parentToken, args = {}) {
 
   childToken.onCancel(() => cleanup());
 
-  // Timeout timer
-  const timeoutMs = skill.timeoutMs || 30_000;
-  const timeoutTimer = setTimeout(() => {
-    childToken.cancel('timeout');
-  }, timeoutMs);
+  // Timeout timer: only set if skill.timeoutMs is not 0 (0 means manual/no timeout)
+  let timeoutTimer = null;
+  const hasTimeout = typeof skill.timeoutMs === 'number' ? skill.timeoutMs > 0 : true;
+  const timeoutMs = typeof skill.timeoutMs === 'number' && skill.timeoutMs > 0 ? skill.timeoutMs : 30_000;
+  if (hasTimeout) {
+    timeoutTimer = setTimeout(() => {
+      childToken.cancel('timeout');
+    }, timeoutMs);
+  }
 
   // Stuck detector: every 3 s, check movement over 15 s while pathfinder has a goal
   let stuckTimer = null;
@@ -101,7 +105,7 @@ async function runSkill(skill, bot, ctx, parentToken, args = {}) {
     log.error(`[Skill:${skill?.name || 'unknown'}] Error:`, err.message);
     return { ok: false, reason: 'error', message: err.message, durationMs };
   } finally {
-    clearTimeout(timeoutTimer);
+    if (timeoutTimer) clearTimeout(timeoutTimer);
     if (stuckTimer) clearInterval(stuckTimer);
   }
 }

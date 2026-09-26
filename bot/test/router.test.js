@@ -103,3 +103,23 @@ test('router ignores regular chat without prefix or command', () => {
   router('Steve', 'hello world, this is normal chat');
   assert.equal(called, false);
 });
+
+test('router parses prefix at end of message', () => {
+  const intents = [];
+  const router = createRouter({
+    botUsername: 'Helper',
+    ownerName: 'Steve',
+    prefixes: ['helper', '!', '@helper'],
+    onIntentText: (text) => { intents.push(text); },
+  });
+
+  router('Steve', 'follow me helper');
+  router('Steve', 'give me food, helper');
+  router('Steve', 'stop following me and give me food helper');
+
+  assert.deepEqual(intents, [
+    'follow me',
+    'give me food',
+    'stop following me and give me food',
+  ]);
+});

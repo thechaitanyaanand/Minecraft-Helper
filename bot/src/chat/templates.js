@@ -1,8 +1,17 @@
 'use strict';
 
+function matchTopic(text = '') {
+  const t = String(text).toLowerCase();
+  if (/crafting|table|workbench|desk/i.test(t)) return 'crafting_table';
+  if (/pickaxe|pick|stone|tool|hathoda/i.test(t)) return 'pickaxe';
+  if (/night|dark|raat|monster|zombie|creeper|skeleton|shelter|dusk/i.test(t)) return 'night';
+  if (/food|hungry|eat|hunger|khana|starv|meat/i.test(t)) return 'food';
+  return t.replace(/\s+/g, '_');
+}
+
 const templates = {
   welcome(name) {
-    return `Hi ${name}! I'm your helper. Tell me what you want starting with "helper" (e.g. "helper get wood", "helper make a pickaxe"). Type !help for commands or !stop to stop me.`;
+    return `Hi ${name}! I'm your helper. Tell me what you want in normal words, starting with "helper". Try: "helper get wood", "helper make a pickaxe", "helper play for me". Type !stop to stop me, !help for more.`;
   },
 
   help() {
@@ -33,6 +42,15 @@ const templates = {
   },
 
   announceGoal(goalId, learn = false) {
+    if (learn) {
+      const learnMap = {
+        get_wood: 'Logs make planks, which craft sticks and tools. Punch tree trunks to gather logs!',
+        make_tools: 'Wooden pickaxe mines cobblestone, which makes faster stone pickaxes and swords!',
+        get_food: 'Keep hunger above 18 to naturally heal. Hunt animals to cook food!',
+        survive_night: 'Monsters spawn in dark areas. Dig 3 blocks down and seal the roof until morning!',
+      };
+      if (learnMap[goalId]) return learnMap[goalId];
+    }
     const map = {
       get_wood: 'Going to collect wood logs from nearby trees. Wood is the foundation of everything in Minecraft!',
       make_tools: 'Making tools: starting with a wooden pickaxe, then upgrading to stone.',
@@ -65,17 +83,27 @@ const templates = {
           ? 'Placing a crafting table. 4 planks in a 2x2 grid gives you a 3x3 table for advanced recipes.'
           : 'Placing crafting table...';
       case 'craft_tool':
-        return `Crafting ${args.item || 'tool'} at the crafting table...`;
+        return learn
+          ? `Crafting ${args.item || 'tool'} at the table: tools need sticks and material (wood, stone, iron).`
+          : `Crafting ${args.item || 'tool'} at the crafting table...`;
       case 'mine_stone':
-        return 'Mining stone with pickaxe to collect cobblestone...';
+        return learn
+          ? 'Mine smooth stone with any pickaxe to collect cobblestone. Hands won\'t drop stone!'
+          : 'Mining stone with pickaxe to collect cobblestone...';
       case 'hunt_food':
-        return 'Hunting nearby animals for meat...';
+        return learn
+          ? 'Defeating animals drops meat. Cooking it in a furnace restores much more hunger.'
+          : 'Hunting nearby animals for meat...';
       case 'eat':
-        return 'Eating food to restore hunger...';
+        return learn
+          ? 'Hold food in hand and eat to keep hunger above 18 so your health regenerates.'
+          : 'Eating food to restore hunger...';
       case 'flee':
         return 'Danger! Running away from hostile monster!';
       case 'fight':
-        return 'Attacking hostile monster with weapon!';
+        return learn
+          ? 'Attacking monster! Time attacks with the cooldown sweep for maximum damage.'
+          : 'Attacking hostile monster with weapon!';
       case 'dig_in':
         return learn
           ? 'Digging a 3-block hole and sealing the ceiling to safely wait out the night.'
@@ -97,20 +125,34 @@ const templates = {
         return `Taking too long to finish ${skill}, cancelling.`;
       case 'stuck':
         return 'I got stuck while moving — clearing path.';
+      case 'no_space':
+        return 'No suitable open spot found nearby to place the block.';
+      case 'no_recipe_or_missing_items':
+        return 'Missing ingredients or crafting table to craft this.';
+      case 'owner_not_found':
+        return 'I can\'t see you — please come closer (within ~60 blocks).';
+      case 'too_many_steps':
+        return 'This task exceeded maximum step limit. Stopping for safety.';
+      case 'no_source':
+        return 'I don\'t know how to obtain that item yet.';
+      case 'too_deep':
+        return 'Recipe is too complex or circular to plan.';
       default:
-        return `Couldn't complete ${skill}: ${reason || 'unknown reason'}.`;
+        return `Couldn't complete ${skill}: ${String(reason || 'unknown issue').replace(/_/g, ' ')}.`;
     }
   },
 
-  explain(topic) {
+  explain(topic = '') {
+    const key = matchTopic(topic);
     const map = {
-      crafting_table: 'A crafting table allows a 3x3 crafting grid. Place 4 wood planks in your 2x2 inventory grid to make one.',
-      pickaxe: 'A wooden pickaxe mines stone, which lets you craft durable stone tools. You can\'t mine stone with bare hands.',
+      crafting_table: 'A crafting table gives you a 3x3 crafting grid. Put 4 wood planks in your 2x2 inventory grid (E) to make one.',
+      pickaxe: 'A wooden pickaxe mines stone for durable stone tools. Bare hands cannot mine stone blocks.',
       night: 'At night, hostile monsters (zombies, skeletons, creepers) spawn in the dark. Sleep in a bed or hide in a shelter until dawn.',
-      food: 'When hunger drops below 18, you stop healing. At 0, you lose health. Hunt animals and eat meat to restore it.',
+      food: 'When hunger drops below 18, you stop healing. At 0, you take starvation damage. Hunt animals and eat meat to restore it.',
     };
-    return map[topic] || 'Ask me about: crafting_table, pickaxe, night, or food.';
+    return map[key] || 'Ask me about: crafting_table, pickaxe, night, or food.';
   },
 };
 
 module.exports = templates;
+

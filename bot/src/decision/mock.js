@@ -8,17 +8,17 @@ try {
 }
 
 const INTENT_RULES = [
-  { intent: 'get_wood', regex: /(wood|log|tree|lakdi|chop)/i },
-  { intent: 'make_tools', regex: /(pickaxe|pick|tool|axe|sword)/i },
-  { intent: 'get_food', regex: /(food|hungry|eat|khana|hunt)/i },
-  { intent: 'survive_night', regex: /(night|dark|raat|hide|shelter|safe|zombie)/i },
-  { intent: 'follow_me', regex: /\b(follow)\b/i },
-  { intent: 'come_here', regex: /\b(come|here|aao)\b/i },
-  { intent: 'give_items', regex: /\b(give|drop|hand over)\b/i },
-  { intent: 'autopilot', regex: /(auto|play for me|what do i do|idk|bored)/i },
-  { intent: 'explain', regex: /(how|what is|why|explain)/i },
-  { intent: 'stop', regex: /\b(stop)\b/i },
-  { intent: 'status', regex: /\b(status)\b/i },
+  { intent: 'explain', regex: /\b(how\b|why\b|what is\b|what's\b|what are\b|explain\b|kaise\b|kya hai\b|batao\b)/i },
+  { intent: 'get_wood', regex: /(wood|log|tree|lakdi|lakadi|chop|katna|wod|woood|choping)/i },
+  { intent: 'make_tools', regex: /(pickaxe|picaxe|pikaxe|pick|tool|axe|sword|hathoda|banau|banao|craft)/i },
+  { intent: 'get_food', regex: /(food|hungry|eat|khana|hunt|bhookh|bhuk|shikar|fod|chiken|khao)/i },
+  { intent: 'survive_night', regex: /(night|dark|raat|hide|shelter|safe|zombie|bachao|chupna|dusk)/i },
+  { intent: 'follow_me', regex: /\b(follow|piche|saath|aage|chal)\b/i },
+  { intent: 'come_here', regex: /\b(come|here|aao|idhar|paas)\b/i },
+  { intent: 'give_items', regex: /\b(give|drop|hand over|de do|dedo|saman)\b/i },
+  { intent: 'autopilot', regex: /(auto|play for me|what do i do|idk|bored|khel|khelna|kuch karo)\b/i },
+  { intent: 'stop', regex: /\b(stop|ruko|ruk|tham|stopp|wait)\b/i },
+  { intent: 'status', regex: /\b(status|kya kar rahe|state|info)\b/i },
 ];
 
 function spreadProbabilities(options, chosen, chosenP) {

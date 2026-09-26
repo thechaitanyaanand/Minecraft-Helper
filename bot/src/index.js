@@ -26,6 +26,11 @@ let pendingQuestion = null;
 let planner = null;
 const decider = createDecider(config);
 
+const setPending = (type, data) => {
+  if (pendingQuestion?.timeout) clearTimeout(pendingQuestion.timeout);
+  pendingQuestion = { type, ...data, timeout: setTimeout(() => { pendingQuestion = null; }, 30000) };
+};
+
 const makeCtx = () => {
   const pl = planner?.getState?.() || {};
   return { ownerName: config.ownerName, currentGoal: pl.currentGoal || 'none', currentStep: pl.currentStep || 'none', lastStepResult: 'none', autopilot: pl.mode === 'autopilot' };
@@ -57,7 +62,15 @@ function handleCommand(cmd, rest) {
     case 'yes':
     case 'no': {
       const c = pendingQuestion?.type === 'confirm' ? pendingQuestion.choice : null;
-      if (c) { clearTimeout(pendingQuestion.timeout); pendingQuestion = null; return cmd === 'yes' ? planner?.startGoal(c) : say('Okay, what would you like me to do?'); }
+      if (c) {
+        const top3 = pendingQuestion.top3;
+        clearTimeout(pendingQuestion.timeout);
+        pendingQuestion = null;
+        if (cmd === 'yes') return planner?.startGoal(c);
+        const opts = top3?.length ? top3 : ['get_wood', 'make_tools', 'get_food'];
+        setPending('pick', { options: opts });
+        return say(templates.pickOne(opts));
+      }
       return say('No confirmation was pending.');
     }
     case '1':
@@ -100,11 +113,7 @@ async function handleIntentText(text) {
   const topProbs = Object.fromEntries(Object.entries(probs).sort(([, a], [, b]) => b - a).slice(0, 3));
   lastDecision = { purpose: 'intent', chosen: choice, confidence: conf, topProbs, backend: res.backend, fallback: res.fallback };
 
-  const setPending = (type, data) => {
-    if (pendingQuestion?.timeout) clearTimeout(pendingQuestion.timeout);
-    pendingQuestion = { type, ...data, timeout: setTimeout(() => { pendingQuestion = null; }, 30000) };
-  };
-
+  const top3 = Object.entries(probs).filter(([k]) => k !== 'unclear').sort(([, a], [, b]) => b - a).slice(0, 3).map(([k]) => k.replace(/_/g, ' '));
   if (choice === 'unclear' && conf >= 0.5) return say(templates.unclear());
   if (choice === 'explain') return say(templates.explain(text.toLowerCase()));
   if (choice === 'status' || choice === 'stop') return handleCommand(choice, '');
@@ -112,8 +121,7 @@ async function handleIntentText(text) {
   if (choice === 'get_food' && /\bgive\b/i.test(text)) return planner?.startGoal('give_items');
 
   if (conf >= config.decision.confAct) return planner?.startGoal(choice, { learn: res.answers.wants_to_learn?.p > 0.6 });
-  if (conf >= config.decision.confAsk) { setPending('confirm', { choice }); return say(templates.didYouMean(choice.replace(/_/g, ' '))); }
-  const top3 = Object.entries(probs).filter(([k]) => k !== 'unclear').sort(([, a], [, b]) => b - a).slice(0, 3).map(([k]) => k.replace(/_/g, ' '));
+  if (conf >= config.decision.confAsk) { setPending('confirm', { choice, top3 }); return say(templates.didYouMean(choice.replace(/_/g, ' '))); }
   setPending('pick', { options: top3 });
   return say(templates.pickOne(top3));
 }

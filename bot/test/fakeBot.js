@@ -1,5 +1,6 @@
 'use strict';
 const EventEmitter = require('events');
+const { Vec3 } = require('vec3');
 
 class FakeBot extends EventEmitter {
   constructor(username = 'Helper') {
@@ -7,12 +8,7 @@ class FakeBot extends EventEmitter {
     this.username = username;
     this.version = '1.20.4';
     this.entity = {
-      position: {
-        x: 0,
-        y: 64,
-        z: 0,
-        distanceTo: (p) => Math.hypot((p?.x ?? 0) - this.entity.position.x, (p?.y ?? 64) - this.entity.position.y, (p?.z ?? 0) - this.entity.position.z),
-      },
+      position: new Vec3(0, 64, 0),
       isInWater: false,
     };
     this.health = 20;

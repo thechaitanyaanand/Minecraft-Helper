@@ -52,7 +52,8 @@ function getNearby(bot, ownerName, mcData) {
   if (bot?.findBlocks && pos && mcData) {
     try {
       const logIds = logBlockIds(mcData);
-      const found = bot.findBlocks({ matching: logIds, maxDistance: 32, count: 64 });
+      const point = typeof pos.floored === 'function' ? pos.floored() : pos;
+      const found = bot.findBlocks({ matching: logIds, maxDistance: 32, count: 64, point });
       treesWithin32 = Array.isArray(found) ? found.length : 0;
     } catch (_) {}
   }

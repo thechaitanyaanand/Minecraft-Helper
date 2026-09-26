@@ -60,7 +60,7 @@ function logBlockIds(mcData) {
   if (!mcData?.blocksByName) return [];
   const ids = [];
   for (const [name, b] of Object.entries(mcData.blocksByName)) {
-    if (name.endsWith('_log') && !name.startsWith('stripped_')) {
+    if ((name.endsWith('_log') || name.endsWith('_wood') || name.endsWith('_stem')) && !name.startsWith('stripped_')) {
       ids.push(b.id);
     }
   }

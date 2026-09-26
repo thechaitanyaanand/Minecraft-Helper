@@ -13,9 +13,10 @@ Status: **Phases 0–2 done, plus the live view. Next: Phase 3.** See the progre
 | 0 Environment | ✅ done | Paper 1.20.4, TLauncher 1.20.4, Decider 2B in WSL (real calls ~250 ms, cold first call ~1.8 s) |
 | 1 Bot skeleton | ✅ done | `!help !come !follow !stop !status` |
 | Live view | ✅ done | http://127.0.0.1:3000 (§8.7) — do not rebuild |
-| 2 Decision layer | ✅ done | `bot/src/decision/*`, intent + §12.3 gate wired, `!why` works, 36 tests |
-| 3 State builder | ⏭ next | §9 |
-| 4–10 | ⬜ | §10 – §14B |
+| 2 Decision layer | ✅ done | `bot/src/decision/*`, intent + §12.3 gate wired, `!why` works |
+| 3 State builder | ✅ done | `bot/src/state/*`, name check + warm-up on spawn, 50 tests, tests no longer write to logs/ |
+| 4 Skills | ⏭ next | §10 — in 3 batches (§10.4a) |
+| 5–10 | ⬜ | §11 – §14B |
 Target machine: the developer's Windows 11 laptop (details in §3).
 Nothing in this project is pushed or deployed to any cloud. See §0.2.
 
@@ -1003,6 +1004,30 @@ These property names (`allowParkour`, `allowSprinting`, `maxDropDown`, `canDig`,
 
 - `isProtected(block)` is true for: any `*_planks`, `*_door`, `*_bed`, `glass*`, `chest`, `barrel`, `furnace`, `crafting_table`, `torch`, `*_wool`, `*_carpet`, `bricks`, `*_stairs`, `*_slab`, `*_fence*`; **and** any block within **8 blocks of the owner's bed or a chest** found at startup; **and** any block the bot's own list marks as placed by the owner. Track `blockUpdate` events near the owner (best effort).
 - Every skill that digs **must** call `isProtected` before `bot.dig`, and collect only natural blocks (logs, stone, dirt, ores, leaves).
+
+### 10.4a Build the general skills now (so Phase 9 needs no rewrite)
+
+Phase 9 (§14A.4) needs `collect_block`, `craft`, `place_block` and `hunt` with parameters. Build **those** now.
+The MVP names in the table below become **aliases** in `skills/index.js`, not separate files:
+
+| MVP name (alias) | calls |
+|---|---|
+| `collect_logs` {count} | `collect_block` {blockNames: all `*_log` names, count} |
+| `mine_stone` {count} | `collect_block` {blockNames: ['stone'], count, dropName: 'cobblestone', needsTool: 'pickaxe'} |
+| `craft_planks` / `craft_sticks` / `craft_tool` {item} | `craft` {item, count} |
+| `place_crafting_table` | `place_block` {name: 'crafting_table'} (crafts one first if needed) |
+| `hunt_food` | `hunt` {mobNames: FOOD_MOBS} |
+
+Files: `skills/runSkill.js`, `skills/index.js` (registry + aliases), `collectBlock.js`, `craft.js`, `placeBlock.js`,
+`hunt.js`, `eat.js`, `flee.js`, `fight.js`, `digIn.js`, `owner.js` (come / follow / give), `explore.js`, and `safety/protect.js`.
+
+Build in **3 batches**, and let the human test in game after each:
+- **4a** core: `runSkill`, `protect`, `collect_block`, `craft`, `place_block`, the `!skill` debug command
+- **4b** survival: `hunt`, `eat`, `flee`, `fight`, `dig_in`
+- **4c** owner + movement: `come_to_owner`, `follow_owner`, `give_to_owner`, `explore`. Move the existing `!come`/`!follow` code into these skills.
+
+The `!skill <name> [json-args]` debug command lives in `chat/debug.js` and is enabled only when `DEBUG=true` in `.env`.
+`index.js` is already ~200 lines: **do not grow it**. New wiring goes into `skills/` and `chat/debug.js`.
 
 ### 10.4 Skill list (MVP)
 

@@ -7,6 +7,7 @@ const log = require('./log');
 const { CancelToken } = require('./cancel');
 const { createSay } = require('./chat/say');
 const { createRouter } = require('./chat/router');
+const { handleDebugSkill } = require('./chat/debug');
 const templates = require('./chat/templates');
 const { safeMovements } = require('./safety/movements');
 const { startWeb, publish } = require('./web');
@@ -71,6 +72,7 @@ function handleCommand(cmd, rest) {
     }
     case 'auto': return say('Autopilot requested. Full planner available in Phase 5!');
     case 'give': return say('Give items requested. Inventory transfer available in Phase 4!');
+    case 'skill': return handleDebugSkill(rest, bot, makeCtx(), currentCancelToken, say);
     case 'yes':
     case 'no':
       if (pendingQuestion?.type === 'confirm') {
@@ -131,7 +133,7 @@ function warmup() {
 
 function start() {
   log.info(`Connecting to ${config.mc.host}:${config.mc.port} as ${config.mc.username}...`);
-  bot = mineflayer.createBot({ host: config.mc.host, port: config.mc.port, username: config.mc.username, auth: 'offline', version: config.mc.version });
+  bot = mineflayer.createBot({ host: config.mc.host, port: config.mc.port, username: config.mc.username, auth: 'offline', version: config.mc.version, respawn: true });
   bot.loadPlugin(pathfinder);
   bot.loadPlugin(collectBlock);
   say = createSay(bot);
@@ -157,7 +159,7 @@ function start() {
     welcomeOwner();
   });
 
-  bot.on('death', () => publish('event', { kind: 'death', text: 'Helper died, respawning' }));
+  bot.on('death', () => { publish('event', { kind: 'death', text: 'Helper died, respawning' }); bot.respawn?.(); });
   bot.on('playerJoined', (p) => { if (p.username === config.ownerName) welcomeOwner(); });
   bot.on('chat', (u, m) => { publish('chat', { username: u, message: m, self: u === bot.username }); router(u, m); });
   bot.on('goal_reached', () => { if (currentActivity === 'coming to owner') { currentActivity = 'idle'; say('I have arrived!'); } });

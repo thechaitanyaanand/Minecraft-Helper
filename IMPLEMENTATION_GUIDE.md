@@ -1286,9 +1286,9 @@ If the model is **not better** than the heuristic on these, set `INTERRUPT_SOURC
 
 | backend | model | accuracy | acc@CONF_ACT | % asked | p50 ms | p95 ms | date |
 |---|---|---|---|---|---|---|---|
-| mock | – | | | | | | |
-| local | decider-2b | | | | | | |
-| jev | | | | | | | |
+| mock | – | 100.0% | 100.0% | 0.0% | 1 | 1 | 2026-09-27 |
+| local | decider-2b | 75.5% | 95.7% | 25.9% | 428 | 438 | 2026-09-27 |
+| jev | – | pending | pending | pending | – | – | – |
 
 ---
 

@@ -7,18 +7,20 @@ try {
   // heuristics not created yet in Phase 2
 }
 
+const ADVERSARIAL_REGEX = /\b(ignore|disregard|jailbreak|swear|bypass|system prompt)\b/i;
+
 const INTENT_RULES = [
-  { intent: 'explain', regex: /\b(how\b|why\b|what is\b|what's\b|what are\b|explain\b|kaise\b|kya hai\b|batao\b)/i },
+  { intent: 'stop', regex: /\b(stop|ruko|ruk|tham|stopp|wait|halt|freeze|cancel)\b/i },
+  { intent: 'status', regex: /\b(status|kya kar rahe|state|info|health|food do you have|how are you|what are you doing|what you are doing|current status|hal batao)\b/i },
+  { intent: 'give_items', regex: /\b(give|drop|hand over|de do|dedo|saman|inventory|toss|maal|giv itms)\b/i },
+  { intent: 'explain', regex: /\b(how\b|why\b|what is\b|what's\b|what are\b|what happens\b|explain\b|kaise\b|kya hai\b|kya kaam\b|kya hota\b|batao\b|tell me how)/i },
+  { intent: 'follow_me', regex: /\b(follow|folow|piche|saath|aage|chal|stay with|walk behind|tag along|side|keep following)\b/i },
+  { intent: 'come_here', regex: /\b(come here|cm here|idhar aao|mere paas aao|come over|come to|meet me|yahan aao|helper come|walk over)\b/i },
+  { intent: 'survive_night', regex: /(night|dark|raat|shelter|safe|zombie|bachao|chupna|dusk|monsters)/i },
+  { intent: 'make_tools', regex: /(pickaxe|picaxe|pikaxe|pick\b|tools?|axe\b|sword|hathoda|tools to stone)/i },
   { intent: 'get_wood', regex: /(wood|log|tree|lakdi|lakadi|chop|katna|wod|woood|choping)/i },
-  { intent: 'make_tools', regex: /(pickaxe|picaxe|pikaxe|pick|tool|axe|sword|hathoda|banau|banao|craft)/i },
-  { intent: 'get_food', regex: /(food|hungry|eat|khana|hunt|bhookh|bhuk|shikar|fod|chiken|khao)/i },
-  { intent: 'survive_night', regex: /(night|dark|raat|hide|shelter|safe|zombie|bachao|chupna|dusk)/i },
-  { intent: 'follow_me', regex: /\b(follow|piche|saath|aage|chal)\b/i },
-  { intent: 'come_here', regex: /\b(come|here|aao|idhar|paas)\b/i },
-  { intent: 'give_items', regex: /\b(give|drop|hand over|de do|dedo|saman)\b/i },
-  { intent: 'autopilot', regex: /(auto|play for me|what do i do|idk|bored|khel|khelna|kuch karo)\b/i },
-  { intent: 'stop', regex: /\b(stop|ruko|ruk|tham|stopp|wait)\b/i },
-  { intent: 'status', regex: /\b(status|kya kar rahe|state|info)\b/i },
+  { intent: 'get_food', regex: /(food|hungry|hungri|eat|khana|hunt|bhookh|bhuk|shikar|fod|chiken|khao|meat)/i },
+  { intent: 'autopilot', regex: /(auto|play for me|what do i do|dont know|don't know|idk|bored|khel|khelna|kuch karo|play by yourself|take over)/i },
 ];
 
 function spreadProbabilities(options, chosen, chosenP) {
@@ -44,11 +46,16 @@ function mockDecideSync(state, questions) {
       let conf = 0.8;
 
       if (id === 'intent') {
-        for (const rule of INTENT_RULES) {
-          if (rule.regex.test(msg) && options.includes(rule.intent)) {
-            chosen = rule.intent;
-            conf = 0.9;
-            break;
+        if (ADVERSARIAL_REGEX.test(msg) && options.includes('unclear')) {
+          chosen = 'unclear';
+          conf = 0.9;
+        } else {
+          for (const rule of INTENT_RULES) {
+            if (rule.regex.test(msg) && options.includes(rule.intent)) {
+              chosen = rule.intent;
+              conf = 0.9;
+              break;
+            }
           }
         }
         if (!chosen) {

@@ -135,6 +135,10 @@ function createPlanner(bot, decider, config, say) {
       currentStepName = step.skill;
       const skill = getSkill(step.skill);
       if (!skill) { speak(`Missing skill: ${step.skill}`); return stop('missing_skill'); }
+      if (bot.pathfinder && bot.version) {
+        const { safeMovements } = require('../safety/movements');
+        bot.pathfinder.setMovements(safeMovements(bot, require('minecraft-data')(bot.version)));
+      }
 
       speak(templates.stepStart(step.skill, step.args || {}, opts.learn));
       const res = await runSkill(skill, bot, makeCtx(), goalToken, step.args || {});
@@ -149,8 +153,8 @@ function createPlanner(bot, decider, config, say) {
         if (res.reason === 'cancelled') return;
         if (res.reason === 'owner_not_found') { speak("I can't see you — please come closer."); return stop('owner_not_found'); }
         if (lastFailedStep === step.skill) retries++; else { lastFailedStep = step.skill; retries = 1; }
-        if (retries === 2 && res.reason === 'no_target') {
-          speak('Cannot find target nearby — exploring around first...');
+        if (retries === 2 && (res.reason === 'no_target' || res.reason === 'no_path')) {
+          speak('Cannot reach target from here — exploring around for a path...');
           await runSkill(getSkill('explore'), bot, makeCtx(), goalToken, { distance: 30 });
         } else if (retries > 2) {
           speak(templates.stepFailed(step.skill, res.reason || res.message));

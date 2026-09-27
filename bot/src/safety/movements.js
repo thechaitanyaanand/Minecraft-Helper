@@ -9,7 +9,11 @@ const SCAFFOLD_BLOCK_NAMES = Object.freeze([
   'mud', 'packed_mud', 'mud_bricks',
 ]);
 
-function safeMovements(bot, mcData) {
+const defaultMcData = require('minecraft-data')('1.20.4');
+
+function safeMovements(bot, data = defaultMcData) {
+  const mcData = data || defaultMcData;
+  if (!bot.registry) bot.registry = mcData;
   const m = new Movements(bot);
   m.allowParkour = false;
   m.allowSprinting = true;
@@ -25,6 +29,16 @@ function safeMovements(bot, mcData) {
   for (const n of ['chest', 'barrel', 'furnace', 'crafting_table', 'white_bed', 'red_bed', 'oak_door']) {
     const b = mcData.blocksByName[n];
     if (b) m.blocksCantBreak.add(b.id);
+  }
+
+  // Tool-tier restriction: prevent pathfinder from digging blocks without the required tool
+  const invItems = bot?.inventory?.items ? bot.inventory.items() : [];
+  const heldToolIds = new Set(invItems.map((it) => it.type));
+  for (const b of mcData.blocksArray) {
+    if (b.harvestTools && Object.keys(b.harvestTools).length > 0) {
+      const canHarvest = Object.keys(b.harvestTools).some((id) => heldToolIds.has(Number(id)));
+      if (!canHarvest) m.blocksCantBreak.add(b.id);
+    }
   }
 
   for (const name of SCAFFOLD_BLOCK_NAMES) {

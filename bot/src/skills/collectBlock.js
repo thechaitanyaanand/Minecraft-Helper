@@ -85,7 +85,20 @@ module.exports = {
       return { ok: false, reason: 'no_target' };
     }
 
-    const targetPositions = safePositions.slice(0, count);
+    if (bot.pathfinder?.setMovements) {
+      const { safeMovements } = require('../safety/movements');
+      bot.pathfinder.setMovements(safeMovements(bot, mcData));
+    }
+
+    safePositions.sort((a, b) => {
+      const distA = Math.hypot(a.x - point.x, a.z - point.z) + Math.abs(a.y - point.y) * 2.5;
+      const distB = Math.hypot(b.x - point.x, b.z - point.z) + Math.abs(b.y - point.y) * 2.5;
+      return distA - distB;
+    });
+
+    const accessible = safePositions.filter((p) => Math.abs(p.y - point.y) <= 16);
+    const candidates = accessible.length > 0 ? accessible : safePositions;
+    const targetPositions = candidates.slice(0, count);
     const targetBlocks = targetPositions.map((p) => (bot.blockAt ? bot.blockAt(p) : { position: p })).filter(Boolean);
 
     if (targetBlocks.length === 0) {
@@ -97,9 +110,13 @@ module.exports = {
     token.throwIfCancelled();
     if (bot.collectBlock?.collect) {
       try {
-        await bot.collectBlock.collect(targetBlocks, { ignoreNoPath: true });
+        await bot.collectBlock.collect(targetBlocks, { ignoreNoPath: false });
       } catch (err) {
         if (token.cancelled) throw err;
+        const msg = String(err?.message || '');
+        if (/no path/i.test(msg) || err?.name === 'NoPath') {
+          return { ok: false, reason: 'no_path', message: 'no reachable path to target block' };
+        }
       }
     }
     token.throwIfCancelled();

@@ -14,9 +14,12 @@ async function clearCeilingIfUnderground(bot, ownerPos) {
   const botPos = bot.entity?.position;
   if (!botPos || !ownerPos || !bot.blockAt || !bot.dig || ownerPos.y <= botPos.y + 1) return;
   const feet = typeof botPos.floored === 'function' ? botPos.floored() : new Vec3(botPos.x, botPos.y, botPos.z).floored();
+  const hasPick = bestToolTier(bot, 'pickaxe') !== 'none';
   for (let dy = 2; dy <= 3; dy++) {
     const ceil = bot.blockAt(feet.offset(0, dy, 0));
     if (ceil && ceil.name !== 'air' && (ceil.boundingBox === 'block' || ceil.boundingBox !== 'empty')) {
+      const isStone = ['stone', 'cobblestone', 'deepslate', 'andesite', 'diorite', 'granite', 'tuff'].includes(ceil.name);
+      if (isStone && !hasPick) continue;
       const tool = bot.pathfinder?.bestHarvestTool?.(ceil);
       if (tool && bot.equip) { try { await bot.equip(tool, 'hand'); } catch (_) {} }
       try { await bot.dig(ceil); } catch (_) {}

@@ -7,6 +7,7 @@ class FakeBot extends EventEmitter {
     super();
     this.username = username;
     this.version = '1.20.4';
+    this.registry = require('minecraft-data')('1.20.4');
     this.entity = {
       position: new Vec3(0, 64, 0),
       isInWater: false,

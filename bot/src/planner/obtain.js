@@ -156,9 +156,10 @@ function plan(target, n = 1, inv = {}, depth = 0, seen = new Set()) {
       if (toolSteps.fail) return toolSteps;
       mineSteps = mineSteps.concat(toolSteps);
     }
+    const countToMine = (normTarget === 'oak_log' || normTarget === 'group:logs') && depth > 0 && have === 0 ? Math.max(needed, 3) : needed;
     const toolType = harvestTool ? (harvestTool.includes('pickaxe') ? 'pickaxe' : (harvestTool.includes('axe') ? 'axe' : undefined)) : undefined;
-    mineSteps.push({ skill: 'collect_block', args: { blockNames: sourceBlocks, count: needed, needsTool: toolType } });
-    simInv[normTarget] = (simInv[normTarget] || 0) + needed;
+    mineSteps.push({ skill: 'collect_block', args: { blockNames: sourceBlocks, count: countToMine, needsTool: toolType } });
+    simInv[normTarget] = (simInv[normTarget] || 0) + countToMine;
     Object.assign(inv, simInv);
     return mineSteps;
   }

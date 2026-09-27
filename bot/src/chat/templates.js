@@ -108,6 +108,14 @@ const templates = {
         return learn
           ? 'Digging a 3-block hole and sealing the ceiling to safely wait out the night.'
           : 'Digging an emergency night shelter...';
+      case 'collect_block': {
+        const blocks = Array.isArray(args.blockNames) ? args.blockNames : [args.blockNames].filter(Boolean);
+        const isWood = blocks.some((b) => /(log|wood|stem)$/.test(b));
+        const isStone = blocks.some((b) => /(stone|cobblestone|deepslate)$/.test(b));
+        if (isWood) return learn ? 'Chopping trees with bare hands or an axe to gather wood logs.' : `Chopping logs (target: ${args.count || 4})...`;
+        if (isStone) return learn ? 'Mining stone with a pickaxe to get cobblestone. Hands won\'t drop stone!' : `Mining cobblestone (target: ${args.count || 3})...`;
+        return `Collecting ${blocks[0] || 'blocks'} (target: ${args.count || 1})...`;
+      }
       default:
         return `Performing ${skill}...`;
     }
@@ -121,6 +129,8 @@ const templates = {
     switch (reason) {
       case 'no_target':
         return 'I can\'t find any targets nearby — exploring around.';
+      case 'no_path':
+        return 'I cannot find a walkable path to the target — there may be steep cliffs or deep drops in the way.';
       case 'timeout':
         return `Taking too long to finish ${skill}, cancelling.`;
       case 'stuck':

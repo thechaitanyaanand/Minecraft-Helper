@@ -5,7 +5,7 @@ const { buildState } = require('../state/buildState');
 const { ownerEntity, HOSTILE_MOBS, timeOfDayLabel } = require('../state/world');
 
 function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
-  let enabled = false, runningAction = null, actionStartTime = 0, lastChatter = 0, loopTimer = null;
+  let enabled = false, runningAction = null, actionStartTime = 0, lastChatter = 0, loopTimer = null, inFlight = false;
   const setPending = opts.setPending || (() => {}), suppressedOffers = new Map();
 
   function canChat(isDanger = false) {
@@ -95,7 +95,7 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
   }
 
   async function tick(dangerTrigger = false) {
-    if (!enabled) return;
+    if (!enabled || inFlight) return;
     const plState = planner?.getState?.() || { mode: 'idle' };
     if (plState.mode !== 'idle' && plState.mode !== 'buddy' && !dangerTrigger) return;
 
@@ -112,28 +112,39 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     if (bot.inventory?.items) for (const it of bot.inventory.items()) if (it?.name) inv[it.name] = (inv[it.name] || 0) + it.count;
     const timeOfDay = timeOfDayLabel(bot.time?.timeOfDay ?? 6000);
     const legal = getLegalActions(ownerState, helperHealth, inv, timeOfDay, plState.currentGoal);
-    const q = questions.buddy(legal);
-    const ctx = { ownerName: config.ownerName, currentGoal: plState.currentGoal, currentStep: 'buddy', owner: ownerState };
-    const state = buildState(bot, ctx, { purpose: 'buddy' });
 
-    let chosenAction = 'stay_close', needsHelpP = 0.2;
-    try {
-      const res = await decider.decide(state, q, { purpose: 'buddy' });
-      const act = res.answers?.owner_activity?.choice || 'unknown';
-      chosenAction = res.answers?.buddy_action?.choice || heuristicPick(act, legal, ownerState);
-      needsHelpP = res.answers?.needs_help?.p ?? 0.2;
-    } catch (err) {
-      log.warn('[Buddy] Decision error, using heuristic:', err.message);
-      chosenAction = heuristicPick('unknown', legal, ownerState);
+    if (legal.length === 1 && legal[0] === 'stay_close') {
+      runningAction = 'stay_close'; actionStartTime = now;
+      return executeAction('stay_close', ownerState, 0.1);
     }
 
-    runningAction = chosenAction; actionStartTime = Date.now();
-    await executeAction(chosenAction, ownerState, needsHelpP);
+    inFlight = true;
+    try {
+      const q = questions.buddy(legal);
+      const ctx = { ownerName: config.ownerName, currentGoal: plState.currentGoal, currentStep: 'buddy', owner: ownerState };
+      const state = buildState(bot, ctx, { purpose: 'buddy' });
+
+      let chosenAction = 'stay_close', needsHelpP = 0.2;
+      try {
+        const res = await decider.decide(state, q, { purpose: 'buddy' });
+        const act = res.answers?.owner_activity?.choice || 'unknown';
+        chosenAction = res.answers?.buddy_action?.choice || heuristicPick(act, legal, ownerState);
+        needsHelpP = res.answers?.needs_help?.p ?? 0.2;
+      } catch (err) {
+        log.warn('[Buddy] Decision error, using heuristic:', err.message);
+        chosenAction = heuristicPick('unknown', legal, ownerState);
+      }
+
+      runningAction = chosenAction; actionStartTime = Date.now();
+      await executeAction(chosenAction, ownerState, needsHelpP);
+    } finally {
+      inFlight = false;
+    }
   }
 
   function start() {
     if (loopTimer) clearInterval(loopTimer);
-    loopTimer = setInterval(() => tick(false), 5000);
+    loopTimer = setInterval(() => tick(false), 8000);
     bot?.on?.('entityHurt', (entity) => { if (entity?.username === config.ownerName) tick(true); });
   }
 

@@ -70,16 +70,13 @@ function handleCommand(cmd, rest) {
       const c = pendingQuestion?.type === 'confirm' ? pendingQuestion.choice : null;
       if (!c) return say('No confirmation was pending.');
       const top3 = pendingQuestion.top3;
-      clearTimeout(pendingQuestion.timeout);
-      pendingQuestion = null;
+      clearTimeout(pendingQuestion.timeout); pendingQuestion = null;
       if (cmd === 'yes') return planner?.startGoal(c);
       const opts = top3?.length ? top3 : ['get_wood', 'make_tools', 'get_food'];
       setPending('pick', { options: opts });
       return say(templates.pickOne(opts));
     }
-    case '1':
-    case '2':
-    case '3': {
+    case '1': case '2': case '3': {
       const c = pendingQuestion?.type === 'pick' ? pendingQuestion.options[parseInt(cmd, 10) - 1]?.replace(/\s+/g, '_') : null;
       if (c) { clearTimeout(pendingQuestion.timeout); pendingQuestion = null; return planner?.startGoal(c); }
       return say(`Received: ${cmd}`);
@@ -101,6 +98,9 @@ async function handleIntentText(text) {
   }
   if (/\bstop\s+following\b/i.test(text) && /\bgive\b/i.test(text)) { planner?.stop(); return planner?.startGoal('give_items'); }
   if (/\b(kit|tools|restock|replenish)\b/i.test(text) && !/\b(iron|stone|diamond)\b/i.test(text)) return handleCommand('kit', '');
+  const cleanCmd = text.trim().toLowerCase();
+  if (/^(come\s+(here|to\s+me)|come)$/.test(cleanCmd)) return planner?.startGoal('come_here'); if (/^(follow\s+me|follow)$/.test(cleanCmd)) return planner?.startGoal('follow_me');
+  if (/^stop(\s+all)?$/.test(cleanCmd)) return handleCommand('stop', '');
 
   const state = buildState(bot, makeCtx(), { purpose: 'intent', playerMessage: text });
   const res = await decider.decide(state, questions.intent(), { purpose: 'intent' });

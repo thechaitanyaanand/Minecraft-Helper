@@ -133,3 +133,13 @@ test('createDecider: jev backend falls back to mock on rate limit cap', async ()
   assert.equal(decider.status().lastError, 'rate_limit_cap');
 });
 
+test('createDecider: slot questions resolve verb and category correctly', async () => {
+  const cfg = { decision: { backend: 'mock', timeoutMs: 1000 } };
+  const decider = createDecider(cfg);
+  const q = questions.slots();
+  const res = await decider.decide({ player_message: 'helper get 10 oak planks' }, q);
+
+  assert.equal(res.answers.verb.choice, 'obtain');
+  assert.equal(res.answers.category.choice, 'wood');
+});
+

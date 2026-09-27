@@ -56,11 +56,31 @@ test('shortlist: parseAmount extracts counts', () => {
   assert.equal(parseAmount('make a pickaxe'), 1);
 });
 
-test('shortlist: parseDirectTarget extracts items and aliases', () => {
+test('shortlist: parseDirectTarget extracts items, mobs, and blueprints', () => {
   assert.equal(parseDirectTarget('helper lakdi chahiye', mcData), 'oak_log');
   assert.equal(parseDirectTarget('make an iron pickaxe', mcData), 'iron_pickaxe');
   assert.equal(parseDirectTarget('khana do', mcData), 'cooked_beef');
   assert.equal(parseDirectTarget('i need torches', mcData), 'torch');
+  assert.equal(parseDirectTarget('kill that spider', mcData), 'mob:spider');
+  assert.equal(parseDirectTarget('build a house', mcData), 'blueprint:hut_5x5');
+  assert.equal(parseDirectTarget('build a bigger house', mcData), 'blueprint:hut_7x7');
+});
+
+test('build_blueprint skill runs successfully on fakeBot', async () => {
+  const buildBlueprint = require('../src/skills/buildBlueprint');
+  const { CancelToken } = require('../src/cancel');
+  let placedBlocks = 0;
+  const fakeBot = {
+    version: '1.20.4',
+    entity: { position: { x: 0, y: 64, z: 0, floored: () => ({ x: 0, y: 64, z: 0, offset: (dx, dy, dz) => ({ x: dx, y: 64 + dy, z: dz }) }) } },
+    blockAt: () => ({ name: 'air' }),
+    inventory: { items: () => [{ name: 'oak_planks', count: 64 }] },
+    equip: async () => {},
+    placeBlock: async () => { placedBlocks++; },
+  };
+  const res = await buildBlueprint.run(fakeBot, {}, new CancelToken(), { id: 'hut_5x5' });
+  assert.equal(res.ok, true);
+  assert.ok(res.message.includes('hut_5x5'));
 });
 
 test('shortlist: rankShortlist returns top items under limit', () => {

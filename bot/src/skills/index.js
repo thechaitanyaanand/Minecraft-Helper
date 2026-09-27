@@ -9,6 +9,8 @@ const fight = require('./fight');
 const digIn = require('./digIn');
 const { comeToOwner, followOwner, giveToOwner } = require('./owner');
 const explore = require('./explore');
+const smelt = require('./smelt');
+const buildBlueprint = require('./buildBlueprint');
 const { FOOD_MOBS } = require('../state/world');
 
 const ALL_LOG_NAMES = Object.freeze([
@@ -30,6 +32,8 @@ const skills = {
   follow_owner: followOwner,
   give_to_owner: giveToOwner,
   explore,
+  smelt,
+  build_blueprint: buildBlueprint,
 };
 
 const aliases = {

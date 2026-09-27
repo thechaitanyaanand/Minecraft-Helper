@@ -128,6 +128,33 @@ test('fight: ignores creeper, retreats on low health, and defeats zombie', async
   assert.equal(res.target, 'zombie');
 });
 
+test('fight: engages targetEntity directly and sets GoalFollow', async () => {
+  const bot = new FakeBot();
+  const token = new CancelToken();
+  bot._items = [{ name: 'stone_sword' }];
+  let goalSet = null;
+  const skeleton = { name: 'skeleton', position: new Vec3(2, 64, 0), isValid: true, height: 1.8 };
+  bot.pathfinder = {
+    setGoal: (g) => { if (g) goalSet = g; },
+    stop: () => {},
+  };
+
+  let attacked = false;
+  bot.attack = (target) => {
+    attacked = true;
+    target.isValid = false;
+  };
+  bot.lookAt = async () => {};
+
+  const res = await skills.fight.run(bot, {}, token, { targetEntity: skeleton });
+  assert.equal(res.ok, true);
+  assert.equal(res.target, 'skeleton');
+  assert.equal(attacked, true);
+  assert.ok(goalSet, 'GoalFollow must be set for targetEntity');
+});
+
+
+
 test('dig_in: digs 3 blocks down and seals ceiling', async () => {
   const bot = new FakeBot();
   const token = new CancelToken();

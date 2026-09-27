@@ -60,16 +60,30 @@ function parseAmount(text) {
 
 function parseDirectTarget(text, mcData) {
   if (!text) return null;
-  const t = text.toLowerCase().trim();
+  const clean = text.toLowerCase().replace(/[^a-z0-9_\s]/g, ' ').replace(/\s+/g, ' ').trim();
+
+  // Blueprint check
+  if (/\b(hut|house|shelter)\b/.test(clean)) {
+    return /\b(big|larger|bigger|large|7x7)\b/.test(clean) ? 'blueprint:hut_7x7' : 'blueprint:hut_5x5';
+  }
+
+
+  // Mob check for kill/attack
+  const mobs = ['spider', 'zombie', 'skeleton', 'creeper', 'cow', 'pig', 'sheep', 'chicken', 'drowned', 'enderman'];
+  for (const m of mobs) {
+    if (new RegExp(`\\b${m}s?\\b`, 'i').test(clean)) {
+      return `mob:${m}`;
+    }
+  }
 
   for (const [alias, mapped] of Object.entries(ALIASES)) {
-    if (new RegExp(`\\b${alias}\\b`, 'i').test(t)) {
+    if (new RegExp(`\\b${alias}\\b`, 'i').test(clean)) {
       return mapped;
     }
   }
 
   // Exact item / block check
-  const words = t.split(/\s+/);
+  const words = clean.split(/\s+/);
   for (let i = 0; i < words.length; i++) {
     for (let len = 3; len >= 1; len--) {
       if (i + len <= words.length) {

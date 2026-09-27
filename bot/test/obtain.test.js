@@ -78,3 +78,31 @@ test('plan: group targets resolve correctly', () => {
   assert.ok(Array.isArray(plankSteps));
   assert.ok(plankSteps.some((s) => s.skill === 'craft' && s.args.item === 'oak_planks'));
 });
+
+test('plan: torches, iron_sword, and white_bed produce valid progression', () => {
+  const torchSteps = plan('torch', 4, {});
+  assert.ok(Array.isArray(torchSteps));
+  assert.ok(torchSteps.some((s) => s.skill === 'craft' && s.args.item === 'torch'));
+
+  const swordSteps = plan('iron_sword', 1, {});
+  assert.ok(Array.isArray(swordSteps));
+  assert.ok(swordSteps.some((s) => s.skill === 'smelt' && s.args.item === 'iron_ingot'));
+  assert.ok(swordSteps.some((s) => s.skill === 'craft' && s.args.item === 'iron_sword'));
+
+  const bedSteps = plan('white_bed', 1, {});
+  assert.ok(Array.isArray(bedSteps));
+  assert.ok(bedSteps.some((s) => s.skill === 'craft' && s.args.item === 'white_bed'));
+});
+
+test('plan: material balance for iron_pickaxe plans 11 cobblestone and fuel', () => {
+  const steps = plan('iron_pickaxe', 1, {});
+  const cobble = steps.filter((s) => s.skill === 'collect_block' && s.args.blockNames.includes('stone')).reduce((sum, s) => sum + s.args.count, 0);
+  assert.equal(cobble, 11, 'Must plan 3 for stone pickaxe + 8 for furnace');
+  assert.ok(steps.some((s) => s.skill === 'craft' && s.args.item.endsWith('_planks')), 'Must plan fuel for smelting');
+});
+
+test('plan: group targets recognize non-oak logs and diverse food in inventory', () => {
+  assert.deepEqual(plan('group:logs', 8, { birch_log: 8 }), []);
+  assert.deepEqual(plan('group:food', 4, { cooked_porkchop: 4 }), []);
+});
+

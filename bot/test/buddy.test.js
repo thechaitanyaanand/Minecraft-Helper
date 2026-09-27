@@ -179,10 +179,52 @@ test('buddy: hard override protects owner when owner health <= 8 with hostiles',
     runSkillByName: (skill) => { if (skill === 'fight') fightExecuted = true; },
   };
 
+  bot.entities = {
+    101: { name: 'skeleton', position: new Vec3(11, 64, 11) },
+  };
+
   const buddy = createBuddy(bot, { decide: async () => ({}) }, { ownerName: 'nottheGalactic' }, say, planner, observer);
   buddy.enable();
 
   await buddy.tick(false);
   assert.ok(saidMessage.includes('Defending you'), `Expected defense chat, got "${saidMessage}"`);
+  assert.equal(fightExecuted, true, 'fight skill must be executed when defending');
+  buddy.disable();
+});
+
+test('buddy: offer registers pending question and no suppresses for 5 min', async () => {
+  const bot = new FakeBot();
+  bot.players.nottheGalactic = { username: 'nottheGalactic', entity: { position: new Vec3(10, 64, 10) } };
+  let pending = null;
+  const setPending = (type, data) => { pending = { type, ...data }; };
+  const observer = {
+    getOwnerState: () => ({
+      health: 20,
+      hostiles_near_owner: [],
+      recent: { broke: { oak_log: 2 }, placed: {}, hurt: 0, moved: 5, died: 0 },
+    }),
+  };
+  const decider = {
+    decide: async () => ({
+      answers: {
+        owner_activity: { choice: 'chopping_wood' },
+        buddy_action: { choice: 'gather_same' },
+        needs_help: { p: 0.2 },
+      },
+    }),
+  };
+
+  const buddy = createBuddy(bot, decider, { ownerName: 'nottheGalactic' }, () => {}, { getState: () => ({ mode: 'idle' }) }, observer, { setPending });
+  buddy.enable();
+  await buddy.tick(false);
+
+  assert.ok(pending);
+  assert.equal(pending.type, 'buddy_offer');
+  assert.equal(pending.action, 'gather_same');
+
+  // Verify suppression on 'no'
+  buddy.suppress(pending.action, 300_000);
+  const legal = buddy.getLegalActions(observer.getOwnerState(), 20, {}, 'day', 'none');
+  assert.ok(!legal.includes('gather_same'));
   buddy.disable();
 });

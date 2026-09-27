@@ -25,13 +25,14 @@ function createSystemOneClient(opts) {
     const body = { state, questions, independent: true };
     if (opts.model) body.model = opts.model;
 
+    const timeoutMs = Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : 4000;
     let res;
     try {
       res = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(opts.timeoutMs),
+        signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (e) {
       throw new DecisionError(`network/timeout: ${e.name}: ${e.message}`);

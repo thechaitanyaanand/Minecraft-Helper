@@ -77,7 +77,7 @@ module.exports = {
 
     const recipe = recipes[0];
     const yieldPerRun = recipe.result?.count || 1;
-    const runs = Math.ceil(count / yieldPerRun);
+    const runs = args.runs || Math.ceil(count / yieldPerRun);
 
     token.throwIfCancelled();
     if (bot.craft) {

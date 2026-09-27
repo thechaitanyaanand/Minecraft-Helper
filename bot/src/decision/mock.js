@@ -1,14 +1,8 @@
 'use strict';
-
 let heuristics = null;
-try {
-  heuristics = require('../planner/heuristics');
-} catch (_) {
-  // heuristics not created yet in Phase 2
-}
+try { heuristics = require('../planner/heuristics'); } catch (_) {}
 
 const ADVERSARIAL_REGEX = /\b(ignore|disregard|jailbreak|swear|bypass|system prompt)\b/i;
-
 const INTENT_RULES = [
   { intent: 'stop', regex: /\b(stop|ruko|ruk|tham|stopp|wait|halt|freeze|cancel)\b/i },
   { intent: 'status', regex: /\b(status|kya kar rahe|state|info|health|food do you have|how are you|what are you doing|what you are doing|current status|hal batao)\b/i },
@@ -27,73 +21,39 @@ function spreadProbabilities(options, chosen, chosenP) {
   const otherCount = options.length - 1;
   const otherP = otherCount > 0 ? (1 - chosenP) / otherCount : 0;
   const probs = {};
-  for (const opt of options) {
-    probs[opt] = opt === chosen ? Number(chosenP.toFixed(4)) : Number(otherP.toFixed(4));
-  }
+  for (const opt of options) probs[opt] = opt === chosen ? Number(chosenP.toFixed(4)) : Number(otherP.toFixed(4));
   return probs;
 }
 
 function mockDecideSync(state, questions) {
-  const answers = {};
-  const msg = (state && (state.player_message || state.message || '')).trim();
+  const answers = {}, msg = (state?.player_message || state?.message || '').trim();
 
   for (const [id, q] of Object.entries(questions)) {
     if (q.type === 'choice') {
       const options = Object.keys(q.criteria || {});
       if (options.length < 2) continue;
-
-      let chosen = null;
-      let conf = 0.8;
+      let chosen = null, conf = 0.8;
 
       if (id === 'intent') {
-        if (ADVERSARIAL_REGEX.test(msg) && options.includes('unclear')) {
-          chosen = 'unclear';
-          conf = 0.9;
-        } else {
+        if (ADVERSARIAL_REGEX.test(msg) && options.includes('unclear')) { chosen = 'unclear'; conf = 0.9; }
+        else {
           for (const rule of INTENT_RULES) {
-            if (rule.regex.test(msg) && options.includes(rule.intent)) {
-              chosen = rule.intent;
-              conf = 0.9;
-              break;
-            }
+            if (rule.regex.test(msg) && options.includes(rule.intent)) { chosen = rule.intent; conf = 0.9; break; }
           }
         }
-        if (!chosen) {
-          chosen = options.includes('unclear') ? 'unclear' : options[0];
-          conf = chosen === 'unclear' ? 0.3 : 0.5;
-        }
+        if (!chosen) { chosen = options.includes('unclear') ? 'unclear' : options[0]; conf = chosen === 'unclear' ? 0.3 : 0.5; }
       } else if (id === 'interrupt') {
-        if (heuristics && typeof heuristics.interrupt === 'function') {
-          chosen = heuristics.interrupt(state, q.criteria);
-        } else {
-          // Heuristic default
-          if (options.includes('flee') && (state?.health <= 6 || state?.nearby?.hostile_mobs?.length > 0)) {
-            chosen = 'flee';
-          } else if (options.includes('eat_food') && state?.food < 14) {
-            chosen = 'eat_food';
-          } else if (options.includes('continue_task')) {
-            chosen = 'continue_task';
-          } else {
-            chosen = options[0];
-          }
-        }
+        if (heuristics?.interrupt) chosen = heuristics.interrupt(state, q.criteria);
+        else if (options.includes('flee') && (state?.health <= 6 || state?.nearby?.hostile_mobs?.length > 0)) chosen = 'flee';
+        else if (options.includes('eat_food') && state?.food < 14) chosen = 'eat_food';
+        else chosen = options.includes('continue_task') ? 'continue_task' : options[0];
         conf = 0.8;
       } else if (id === 'next_goal') {
-        if (heuristics && typeof heuristics.nextGoal === 'function') {
-          chosen = heuristics.nextGoal(state, q.criteria);
-        } else {
-          if (options.includes('survive_night') && (state?.time_of_day === 'night' || state?.time_of_day === 'dusk')) {
-            chosen = 'survive_night';
-          } else if (options.includes('get_wood')) {
-            chosen = 'get_wood';
-          } else if (options.includes('make_tools')) {
-            chosen = 'make_tools';
-          } else if (options.includes('get_food')) {
-            chosen = 'get_food';
-          } else {
-            chosen = options[0];
-          }
-        }
+        if (heuristics?.nextGoal) chosen = heuristics.nextGoal(state, q.criteria);
+        else if (options.includes('survive_night') && (state?.time_of_day === 'night' || state?.time_of_day === 'dusk')) chosen = 'survive_night';
+        else if (options.includes('get_wood')) chosen = 'get_wood';
+        else if (options.includes('make_tools')) chosen = 'make_tools';
+        else chosen = options.includes('get_food') ? 'get_food' : options[0];
         conf = 0.8;
       } else if (id === 'owner_activity') {
         const r = state?.owner?.recent || {};
@@ -113,21 +73,40 @@ function mockDecideSync(state, questions) {
         else if (options.includes('scout_ahead') && (state?.owner?.recent?.moved || 0) > 40) chosen = 'scout_ahead';
         else chosen = options.includes('stay_close') ? 'stay_close' : options[0];
         conf = 0.8;
+      } else if (id === 'verb') {
+        if (/give|drop|de do/i.test(msg)) chosen = 'give';
+        else if (/kill|attack|marna/i.test(msg)) chosen = 'attack';
+        else if (/build|house|shelter|hut/i.test(msg)) chosen = 'build';
+        else if (/protect|safe|bachao/i.test(msg)) chosen = 'protect';
+        else if (/come|idhar aao/i.test(msg)) chosen = 'go_to';
+        else if (/follow|piche/i.test(msg)) chosen = 'follow';
+        else if (/stop|ruko/i.test(msg)) chosen = 'stop';
+        else if (/explain|how|why|kaise/i.test(msg)) chosen = 'explain';
+        else if (/buddy|together/i.test(msg)) chosen = 'buddy';
+        else if (/status/i.test(msg)) chosen = 'status';
+        else if (/get|need|craft|make|chahiye/i.test(msg)) chosen = 'obtain';
+        else chosen = options.includes('unclear') ? 'unclear' : options[0];
+        conf = 0.85;
+      } else if (id === 'category') {
+        if (/pickaxe|axe|shovel|hoe/i.test(msg)) chosen = 'tools';
+        else if (/sword|bow|shield|armor/i.test(msg)) chosen = 'weapons_armor';
+        else if (/wood|log|plank|stick|lakdi/i.test(msg)) chosen = 'wood';
+        else if (/stone|coal|iron|gold|diamond|patthar/i.test(msg)) chosen = 'stone_ores';
+        else if (/food|beef|meat|bread|apple|khana/i.test(msg)) chosen = 'food';
+        else if (/torch|bed|chest|furnace|door|table/i.test(msg)) chosen = 'utility';
+        else if (/block|house|hut/i.test(msg)) chosen = 'building_blocks';
+        else if (/zombie|skeleton|spider|creeper|cow|pig/i.test(msg)) chosen = 'mob';
+        else chosen = options.includes('none') ? 'none' : options[0];
+        conf = 0.85;
       } else {
         chosen = options[0];
       }
 
-      answers[id] = {
-        type: 'choice',
-        choice: chosen,
-        confidence: conf,
-        probabilities: spreadProbabilities(options, chosen, conf),
-      };
+      answers[id] = { type: 'choice', choice: chosen, confidence: conf, probabilities: spreadProbabilities(options, chosen, conf) };
     } else if (q.type === 'noul') {
       let p = 0.1;
-      if (id === 'wants_to_learn') {
-        p = /(how|learn|teach|why|kaise)/i.test(msg) ? 0.85 : 0.15;
-      } else if (id === 'danger') {
+      if (id === 'wants_to_learn') p = /(how|learn|teach|why|kaise)/i.test(msg) ? 0.85 : 0.15;
+      else if (id === 'danger') {
         const lowHealth = state?.health !== undefined && state.health <= 6;
         const hostiles = (state?.nearby?.hostile_mobs?.length || 0) > 0 || state?.nearby_mob === 'zombie' || state?.nearby_mob === 'creeper';
         p = lowHealth || hostiles ? 0.85 : 0.1;
@@ -135,40 +114,19 @@ function mockDecideSync(state, questions) {
         const r = state?.owner?.recent || {};
         p = (r.hurt > 0 || (state?.owner?.health && state.owner.health <= 8) || r.died > 0) ? 0.85 : 0.15;
       }
-      answers[id] = {
-        type: 'noul',
-        p,
-      };
+      answers[id] = { type: 'noul', p };
     } else if (q.type === 'score') {
-      answers[id] = {
-        type: 'score',
-        score: 1,
-        confidence: 0.8,
-        probabilities: {},
-      };
+      answers[id] = { type: 'score', score: 1, confidence: 0.8, probabilities: {} };
     }
   }
 
   return answers;
 }
 
-/**
- * Mock decision backend matching decide() contract.
- * @param {object} state
- * @param {object} questions
- * @returns {Promise<{answers:object, latencyMs:number, backend:string, raw:object}>}
- */
 async function mockDecide(state, questions) {
   const start = Date.now();
   const answers = mockDecideSync(state, questions);
-  const latencyMs = Math.max(1, Date.now() - start);
-
-  return {
-    answers,
-    latencyMs,
-    backend: 'mock',
-    raw: { model: 'mock', answers },
-  };
+  return { answers, latencyMs: Math.max(1, Date.now() - start), backend: 'mock', raw: { model: 'mock', answers } };
 }
 
 module.exports = { mockDecide, mockDecideSync };

@@ -56,12 +56,12 @@ const templates = {
       make_tools: 'Making tools: starting with a wooden pickaxe, then upgrading to stone.',
       get_food: 'Hunting for food nearby so we don\'t starve.',
       survive_night: 'Night is dangerous! Looking for shelter or digging a safe hole.',
-      follow_me: 'Following you now.',
-      come_here: 'Coming to where you are.',
+      follow_me: '',
+      come_here: '',
       give_items: 'Dropping items for you.',
       autopilot: 'Autopilot enabled! Surviving and gathering resources.',
     };
-    return map[goalId] || `Starting task: ${goalId}`;
+    return map[goalId] ?? `Starting task: ${goalId}`;
   },
 
   stepStart(skill, args = {}, learn = false) {
@@ -116,12 +116,16 @@ const templates = {
         if (isStone) return learn ? 'Mining stone with a pickaxe to get cobblestone. Hands won\'t drop stone!' : `Mining cobblestone (target: ${args.count || 3})...`;
         return `Collecting ${blocks[0] || 'blocks'} (target: ${args.count || 1})...`;
       }
+      case 'come_to_owner':
+      case 'follow_owner':
+        return '';
       default:
         return `Performing ${skill}...`;
     }
   },
 
   stepDone(skill, message = '') {
+    if (['come_to_owner', 'follow_owner', 'come_here', 'follow_me'].includes(skill)) return '';
     return message ? `Done: ${message}` : `Finished ${skill}.`;
   },
 

@@ -80,3 +80,15 @@ test('all template outputs are within 240 chars limit', () => {
     assert.ok(s.length <= 240, `String exceeded 240 chars (${s.length}): "${s}"`);
   }
 });
+
+test('navigation announcements and step messages are silenced', () => {
+  assert.equal(templates.announceGoal('come_here'), '');
+  assert.equal(templates.announceGoal('follow_me'), '');
+  assert.equal(templates.stepStart('come_to_owner'), '');
+  assert.equal(templates.stepStart('follow_owner'), '');
+  assert.equal(templates.stepDone('come_to_owner'), '');
+  assert.equal(templates.stepDone('follow_owner'), '');
+  assert.equal(templates.stepDone('come_here'), '');
+  assert.equal(templates.stepDone('follow_me'), '');
+});
+

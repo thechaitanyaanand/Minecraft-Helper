@@ -124,11 +124,11 @@ async function handleIntentText(text) {
     const hasNum = /\b\d+\b/.test(text) || /\b(stack|few|couple)\b/i.test(text);
     if (!hasNum && choice === 'get_wood') return planner?.startGoal('get_wood');
     if (!hasNum && choice === 'get_food') return planner?.startGoal('get_food');
-    return planner?.startGoal(`obtain:${target}:${parseAmount(text)}`, { give: /\bgive\b/i.test(text) });
+    return planner?.startGoal(`obtain:${target}:${parseAmount(text)}`, { give: /\b(give|me|for\s+me)\b/i.test(text) });
   }
 
   if (choice === 'unclear' && conf >= 0.5) return say(templates.unclear());
-  if (conf >= config.decision.confAct) return planner?.startGoal(choice, { learn: res.answers.wants_to_learn?.p > 0.6 });
+  if (conf >= config.decision.confAct) return planner?.startGoal(choice, { learn: res.answers.wants_to_learn?.p > 0.6, give: /\b(give|me|for\s+me)\b/i.test(text) });
   if (conf >= config.decision.confAsk) { setPending('confirm', { choice, top3 }); return say(templates.didYouMean(choice.replace(/_/g, ' '))); }
   setPending('pick', { options: top3 });
   return say(templates.pickOne(top3));

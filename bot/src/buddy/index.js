@@ -60,6 +60,8 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     if (!owner) return;
 
     if (action === 'stay_close') {
+      const pl = planner?.getState?.();
+      if (pl && pl.mode !== 'idle') return;
       const pos = bot.entity?.position;
       if (pos && owner.position && pos.distanceTo(owner.position) > 6) planner?.startGoal?.('come_here');
     } else if (action === 'protect_owner') {
@@ -97,6 +99,7 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
   async function tick(dangerTrigger = false) {
     if (!enabled || inFlight) return;
     const plState = planner?.getState?.() || { mode: 'idle' };
+    if (plState.mode === 'goal') return;
     if (plState.mode !== 'idle' && plState.mode !== 'buddy' && !dangerTrigger) return;
 
     const ownerState = observer.getOwnerState(), helperHealth = Math.round(bot.health || 20);
@@ -158,7 +161,7 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     disable: () => { enabled = false; stop(); },
     toggle: () => { enabled = !enabled; if (enabled) start(); else stop(); return enabled; },
     isEnabled: () => enabled,
-    tick, suppress, getLegalActions, heuristicPick, cleanup: stop,
+    tick, suppress, getLegalActions, heuristicPick, cleanup: stop, executeAction,
   };
 }
 

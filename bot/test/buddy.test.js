@@ -228,3 +228,42 @@ test('buddy: offer registers pending question and no suppresses for 5 min', asyn
   assert.ok(!legal.includes('gather_same'));
   buddy.disable();
 });
+
+test('buddy: tick returns early without dispatching when planner mode is goal', async () => {
+  const bot = new FakeBot();
+  bot.players.nottheGalactic = { username: 'nottheGalactic', entity: { position: new Vec3(10, 64, 10) } };
+  let deciderCalled = false;
+  const decider = {
+    decide: async () => {
+      deciderCalled = true;
+      return {};
+    },
+  };
+  const observer = {
+    getOwnerState: () => ({ health: 20, hostiles_near_owner: [], recent: {} }),
+  };
+  const planner = {
+    getState: () => ({ mode: 'goal' }),
+    startGoal: () => {},
+  };
+  const buddy = createBuddy(bot, decider, { ownerName: 'nottheGalactic' }, () => {}, planner, observer);
+  buddy.enable();
+  await buddy.tick(false);
+  assert.equal(deciderCalled, false, 'decider must not be called when planner is executing a goal');
+  buddy.disable();
+});
+
+test('buddy: stay_close does not interrupt active non-idle planner mode', async () => {
+  const bot = new FakeBot();
+  bot.entity = { position: new Vec3(0, 64, 0) };
+  bot.players.nottheGalactic = { username: 'nottheGalactic', entity: { position: new Vec3(50, 64, 50) } };
+  let startedGoal = null;
+  const planner = {
+    getState: () => ({ mode: 'goal' }),
+    startGoal: (g) => { startedGoal = g; },
+  };
+  const buddy = createBuddy(bot, { decide: async () => ({}) }, { ownerName: 'nottheGalactic' }, () => {}, planner, {});
+  await buddy.executeAction('stay_close', 'Stay close');
+  assert.equal(startedGoal, null, 'stay_close must not override active goal');
+});
+

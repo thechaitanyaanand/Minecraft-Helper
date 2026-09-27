@@ -118,6 +118,7 @@ function createPlanner(bot, decider, config, say) {
       } else {
         if (goal.done(bot, makeCtx())) {
           speak(templates.stepDone(goalId, `Completed goal: ${goal.describe}`));
+          if (opts.give || goalId === 'get_food') await runSkill(getSkill('give_to_owner'), bot, makeCtx(), goalToken);
           if (mode === 'autopilot') {
             const next = await pickNextGoal();
             if (next && !goalToken.cancelled) return runGoalLoop(next, { autopilot: true }, goalToken);

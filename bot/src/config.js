@@ -46,6 +46,7 @@ const config = Object.freeze({
     username: process.env.BOT_USERNAME || 'Helper',
   }),
   ownerName,
+  autoKit: process.env.AUTO_KIT !== 'false',
   chatPrefixes: Object.freeze(prefixes),
   decision: Object.freeze({
     backend,

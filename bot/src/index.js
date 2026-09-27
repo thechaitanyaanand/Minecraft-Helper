@@ -5,7 +5,7 @@ const config = require('./config'), log = require('./log'), { CancelToken } = re
 const templates = require('./chat/templates'), questions = require('./decision/questions');
 const { buildState } = require('./state/buildState'), { createSay } = require('./chat/say');
 const { createRouter } = require('./chat/router'), { handleDebugSkill } = require('./chat/debug');
-const { safeMovements } = require('./safety/movements'), { startWeb, publish } = require('./web');
+const { safeMovements } = require('./safety/movements'), { replenishKit, startAutoReplenish } = require('./safety/kit'), { startWeb, publish } = require('./web');
 const { buildLiveState } = require('./liveState'), { createDecider } = require('./decision');
 const { createSystemOneClient } = require('./decision/systemone');
 const { timeOfDayLabel, checkNames } = require('./state/world'), { createPlanner } = require('./planner/loop');
@@ -46,6 +46,11 @@ function handleCommand(cmd, rest) {
     case 'follow':
     case 'give': return planner?.startGoal(cmd === 'give' ? 'give_items' : (cmd === 'come' ? 'come_here' : 'follow_me'));
     case 'auto': return planner?.startAutopilot();
+    case 'kit': {
+      const res = replenishKit(bot, config, { force: true });
+      const list = res.replenished?.map(r => r.item).join(', ');
+      return say(list ? `Restocked wooden tools: ${list}.` : 'Wooden tools already fully stocked.');
+    }
     case 'skill': return handleDebugSkill(rest, bot, makeCtx(), new CancelToken(), say);
     case 'yes':
     case 'no': {
@@ -95,6 +100,7 @@ async function handleIntentText(text) {
     if (matched) { clearTimeout(pendingQuestion.timeout); pendingQuestion = null; return planner?.startGoal(matched.replace(/\s+/g, '_')); }
   }
   if (/\bstop\s+following\b/i.test(text) && /\bgive\b/i.test(text)) { planner?.stop(); return planner?.startGoal('give_items'); }
+  if (/\b(kit|tools|restock|replenish)\b/i.test(text) && !/\b(iron|stone|diamond)\b/i.test(text)) return handleCommand('kit', '');
 
   const state = buildState(bot, makeCtx(), { purpose: 'intent', playerMessage: text });
   const res = await decider.decide(state, questions.intent(), { purpose: 'intent' });
@@ -146,9 +152,10 @@ function start() {
     onCommand: handleCommand, onIntentText: handleIntentText, getPendingQuestion: () => Boolean(pendingQuestion),
   });
 
-  let welcomed = false;
+  let welcomed = false, autoKit = null;
   const welcomeOwner = () => { if (!welcomed && bot.players[config.ownerName]) { welcomed = true; say(templates.welcome(config.ownerName)); } };
 
+  bot.on('spawn', () => { replenishKit(bot, config); });
   bot.once('spawn', () => {
     log.info(`Spawned at ${bot.entity.position}`);
     const mcData = require('minecraft-data')(bot.version);
@@ -156,7 +163,7 @@ function start() {
     bot.pathfinder.setMovements(safeMovements(bot, mcData));
     bot.on('physicsTick', () => { if (bot.entity?.isInWater) bot.setControlState('jump', true); });
     publish('event', { kind: 'spawn', text: `Joined world at ${bot.entity.position.floored()}` });
-    welcomeOwner(); buddy.enable();
+    welcomeOwner(); buddy.enable(); autoKit = startAutoReplenish(bot, config);
   });
 
   bot.on('death', () => { publish('event', { kind: 'death', text: 'Helper died, respawning' }); bot.respawn?.(); });
@@ -164,7 +171,7 @@ function start() {
   bot.on('chat', (u, m) => { publish('chat', { username: u, message: m, self: u === bot.username }); router(u, m); });
   bot.on('kicked', (r) => { log.error('Kicked:', r); publish('event', { kind: 'kicked', text: String(r) }); });
   bot.on('error', (e) => log.error('Bot error:', e.message));
-  bot.on('end', (r) => { log.warn('Disconnected:', r); publish('event', { kind: 'disconnect', text: `Disconnected (${r})` }); setTimeout(start, 10_000); });
+  bot.on('end', (r) => { autoKit?.stop?.(); log.warn('Disconnected:', r); publish('event', { kind: 'disconnect', text: `Disconnected (${r})` }); setTimeout(start, 10_000); });
 }
 process.on('unhandledRejection', (e) => log.error('Unhandled rejection:', e)).on('uncaughtException', (e) => log.error('Uncaught exception:', e.message || e));
 

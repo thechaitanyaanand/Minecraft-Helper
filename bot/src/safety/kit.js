@@ -27,6 +27,10 @@ function replenishKit(bot, config = {}, options = {}) {
   if (config.autoKit === false && !options.force) {
     return { ok: false, reason: 'disabled', replenished: [] };
   }
+  const now = Date.now();
+  if (!options.force && bot?._lastReplenish && now - bot._lastReplenish < 3000) {
+    return { ok: true, replenished: [], skipped: 'cooldown' };
+  }
   if (!bot || typeof bot.chat !== 'function') {
     return { ok: false, reason: 'no_bot', replenished: [] };
   }
@@ -34,6 +38,7 @@ function replenishKit(bot, config = {}, options = {}) {
   if (missing.length === 0) {
     return { ok: true, replenished: [] };
   }
+  if (bot) bot._lastReplenish = now;
   const username = bot.username || 'Helper';
   for (const entry of missing) {
     try {

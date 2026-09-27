@@ -58,19 +58,16 @@ test('kit: replenishKit respects autoKit false', () => {
   assert.ok(bot.chatLog.length > 0);
 });
 
-test('kit: startAutoReplenish periodically checks and can be stopped', (t, done) => {
+test('kit: startAutoReplenish periodically checks and can be stopped', async () => {
   const bot = new FakeBot('Worker');
   bot._items = [];
   const handler = startAutoReplenish(bot, { autoKit: true }, 50);
   assert.ok(typeof handler.stop === 'function');
   assert.ok(bot.chatLog.length >= 4, 'Initial replenishment fired');
 
-  setTimeout(() => {
-    handler.stop();
-    const countAfterStop = bot.chatLog.length;
-    setTimeout(() => {
-      assert.equal(bot.chatLog.length, countAfterStop, 'No more commands after stop');
-      done();
-    }, 80);
-  }, 70);
+  await new Promise((resolve) => setTimeout(resolve, 60));
+  handler.stop();
+  const countAfterStop = bot.chatLog.length;
+  await new Promise((resolve) => setTimeout(resolve, 80));
+  assert.equal(bot.chatLog.length, countAfterStop, 'No more commands after stop');
 });

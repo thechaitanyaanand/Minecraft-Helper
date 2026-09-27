@@ -95,6 +95,24 @@ function mockDecideSync(state, questions) {
           }
         }
         conf = 0.8;
+      } else if (id === 'owner_activity') {
+        const r = state?.owner?.recent || {};
+        if (r.hurt > 0) chosen = 'fighting';
+        else if (Object.keys(r.broke || {}).some(k => /(log|wood|stem)/.test(k))) chosen = 'chopping_wood';
+        else if (Object.keys(r.broke || {}).some(k => /(stone|cobblestone|deepslate|_ore)/.test(k))) chosen = 'mining';
+        else if (Object.keys(r.placed || {}).length > 0) chosen = 'building';
+        else if ((r.moved || 0) > 40) chosen = 'exploring';
+        else if ((r.moved || 0) < 2) chosen = 'idle';
+        else chosen = options.includes('unknown') ? 'unknown' : options[0];
+        conf = 0.8;
+      } else if (id === 'buddy_action') {
+        const hostiles = (state?.owner?.hostiles_near_owner?.length || 0) > 0;
+        if (options.includes('protect_owner') && hostiles) chosen = 'protect_owner';
+        else if (options.includes('gather_same') && Object.keys(state?.owner?.recent?.broke || {}).length > 0) chosen = 'gather_same';
+        else if (options.includes('bring_materials') && Object.keys(state?.owner?.recent?.placed || {}).length > 0) chosen = 'bring_materials';
+        else if (options.includes('scout_ahead') && (state?.owner?.recent?.moved || 0) > 40) chosen = 'scout_ahead';
+        else chosen = options.includes('stay_close') ? 'stay_close' : options[0];
+        conf = 0.8;
       } else {
         chosen = options[0];
       }
@@ -113,6 +131,9 @@ function mockDecideSync(state, questions) {
         const lowHealth = state?.health !== undefined && state.health <= 6;
         const hostiles = (state?.nearby?.hostile_mobs?.length || 0) > 0 || state?.nearby_mob === 'zombie' || state?.nearby_mob === 'creeper';
         p = lowHealth || hostiles ? 0.85 : 0.1;
+      } else if (id === 'needs_help') {
+        const r = state?.owner?.recent || {};
+        p = (r.hurt > 0 || (state?.owner?.health && state.owner.health <= 8) || r.died > 0) ? 0.85 : 0.15;
       }
       answers[id] = {
         type: 'noul',

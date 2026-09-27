@@ -5,26 +5,17 @@ const collectBlock = require('mineflayer-collectblock').plugin;
 const config = require('./config');
 const log = require('./log');
 const { CancelToken } = require('./cancel');
-const { createSay } = require('./chat/say');
-const { createRouter } = require('./chat/router');
-const { handleDebugSkill } = require('./chat/debug');
 const templates = require('./chat/templates');
-const { safeMovements } = require('./safety/movements');
-const { startWeb, publish } = require('./web');
-const { buildLiveState } = require('./liveState');
-const { createDecider } = require('./decision');
-const { createSystemOneClient } = require('./decision/systemone');
 const questions = require('./decision/questions');
 const { buildState } = require('./state/buildState');
-const { timeOfDayLabel, checkNames } = require('./state/world');
-const { createPlanner } = require('./planner/loop');
-const { parseDirectTarget, parseAmount } = require('./planner/shortlist');
+const { createSay } = require('./chat/say'), { createRouter } = require('./chat/router'), { handleDebugSkill } = require('./chat/debug');
+const { safeMovements } = require('./safety/movements'), { startWeb, publish } = require('./web'), { buildLiveState } = require('./liveState');
+const { createDecider } = require('./decision'), { createSystemOneClient } = require('./decision/systemone');
+const { timeOfDayLabel, checkNames } = require('./state/world'), { createPlanner } = require('./planner/loop');
+const { parseDirectTarget, parseAmount } = require('./planner/shortlist'), { createObserver } = require('./buddy/observe'), { createBuddy } = require('./buddy');
 
-let bot = null;
-let say = () => {};
-let lastDecision = null;
-let pendingQuestion = null;
-let planner = null;
+let bot = null, say = () => {}, lastDecision = null, pendingQuestion = null;
+let planner = null, observer = null, buddy = null;
 const decider = createDecider(config);
 
 const setPending = (type, data) => {
@@ -34,7 +25,7 @@ const setPending = (type, data) => {
 
 const makeCtx = () => {
   const pl = planner?.getState?.() || {};
-  return { ownerName: config.ownerName, currentGoal: pl.currentGoal || 'none', currentStep: pl.currentStep || 'none', lastStepResult: 'none', autopilot: pl.mode === 'autopilot' };
+  return { ownerName: config.ownerName, currentGoal: pl.currentGoal || 'none', currentStep: pl.currentStep || 'none', lastStepResult: 'none', autopilot: pl.mode === 'autopilot', owner: observer?.getOwnerState?.() };
 };
 
 function handleCommand(cmd, rest) {
@@ -47,6 +38,10 @@ function handleCommand(cmd, rest) {
     case 'status': {
       const pl = planner?.getState?.() || { mode: 'idle' };
       return say(templates.status({ health: Math.round(bot?.health || 20), food: Math.round(bot?.food || 20), timeOfDay: timeOfDayLabel(bot?.time?.timeOfDay ?? 6000), activity: pl.mode === 'idle' ? 'idle' : `${pl.mode}: ${pl.currentGoal} (${pl.currentStep})`, backend: decider.status().backend }));
+    }
+    case 'buddy': {
+      const on = buddy?.toggle();
+      return say(`Buddy mode is now ${on ? 'active' : 'off'}.`);
     }
     case 'stop':
       planner?.stop();
@@ -142,6 +137,8 @@ function start() {
   bot.loadPlugin(collectBlock);
   say = createSay(bot);
   planner = createPlanner(bot, decider, config, say);
+  observer = createObserver(bot, config.ownerName);
+  buddy = createBuddy(bot, decider, config, say, planner, observer);
 
   const router = createRouter({
     botUsername: config.mc.username, ownerName: config.ownerName, prefixes: config.chatPrefixes,
@@ -163,6 +160,7 @@ function start() {
     bot.on('physicsTick', () => { if (bot.entity?.isInWater) bot.setControlState('jump', true); });
     publish('event', { kind: 'spawn', text: `Joined world at ${bot.entity.position.floored()}` });
     welcomeOwner();
+    buddy.enable();
   });
 
   bot.on('death', () => { publish('event', { kind: 'death', text: 'Helper died, respawning' }); bot.respawn?.(); });
@@ -191,8 +189,5 @@ function startLiveView() {
   }, 500);
 }
 
-if (require.main === module) {
-  startLiveView();
-  start();
-}
+if (require.main === module) { startLiveView(); start(); }
 module.exports = { start };

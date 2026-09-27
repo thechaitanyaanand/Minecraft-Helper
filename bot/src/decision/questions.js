@@ -99,10 +99,7 @@ function buildNextGoalQuestions(availableGoals) {
     }
   }
 
-  if (Object.keys(criteria).length < 2) {
-    return null;
-  }
-
+  if (Object.keys(criteria).length < 2) return null;
   return {
     next_goal: {
       type: 'choice',
@@ -112,11 +109,63 @@ function buildNextGoalQuestions(availableGoals) {
   };
 }
 
+const OWNER_ACTIVITY_CRITERIA = Object.freeze({
+  chopping_wood: 'breaking logs',
+  mining: 'breaking stone or ores',
+  building: 'placing blocks',
+  fighting: 'fighting or being hurt by monsters',
+  exploring: 'walking far',
+  idle: 'standing still',
+  unknown: 'cannot tell',
+});
+
+const BUDDY_ACTION_CRITERIA = Object.freeze({
+  stay_close: 'stay near the player and follow them',
+  protect_owner: 'fight monsters threatening the player',
+  gather_same: 'gather the same resource nearby',
+  bring_materials: 'bring building blocks to the player',
+  give_food: 'give food to the hungry or hurt player',
+  build_shelter_near_owner: 'build a quick shelter near the player',
+  scout_ahead: 'walk ahead and scout for resources or danger',
+  continue_own_task: 'continue the current ongoing task',
+});
+
+function buildBuddyQuestions(legalActions) {
+  const criteria = {};
+  const options = Array.isArray(legalActions) ? legalActions : Object.keys(BUDDY_ACTION_CRITERIA);
+  for (const opt of options) {
+    if (BUDDY_ACTION_CRITERIA[opt]) criteria[opt] = BUDDY_ACTION_CRITERIA[opt];
+  }
+  const q = {
+    owner_activity: {
+      type: 'choice',
+      instructions: 'What is the player doing right now?',
+      criteria: { ...OWNER_ACTIVITY_CRITERIA },
+    },
+    needs_help: {
+      type: 'noul',
+      instructions: 'Does this new player look like they are struggling?',
+      criteria: { true: 'player is in danger or needs help', false: 'player is doing fine' },
+    },
+  };
+  if (Object.keys(criteria).length >= 2) {
+    q.buddy_action = {
+      type: 'choice',
+      instructions: 'How should the helper help the player now?',
+      criteria,
+    };
+  }
+  return q;
+}
+
 module.exports = {
   INTENT_CRITERIA,
   INTERRUPT_CRITERIA,
   NEXT_GOAL_CRITERIA,
+  OWNER_ACTIVITY_CRITERIA,
+  BUDDY_ACTION_CRITERIA,
   intent: buildIntentQuestions,
   interrupt: buildInterruptQuestions,
   next_goal: buildNextGoalQuestions,
+  buddy: buildBuddyQuestions,
 };

@@ -143,6 +143,9 @@ function buildState(bot, ctx = {}, opts = {}) {
   state.current_step = ctx.currentStep || 'none';
   state.last_step_result = ctx.lastStepResult || 'none';
   state.autopilot = Boolean(ctx.autopilot);
+  if (ctx.owner) {
+    state.owner = ctx.owner;
+  }
 
   const jsonStr = JSON.stringify(state);
   if (jsonStr.length > 1500) {

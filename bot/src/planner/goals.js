@@ -1,6 +1,7 @@
 'use strict';
-const { countItem, countItemsMatching, bestToolTier, timeOfDayLabel, ownerEntity } = require('../state/world');
+const { countItem, countItemsMatching, bestToolTier, timeOfDayLabel, ownerEntity, TOOL_TIERS } = require('../state/world');
 const { FOOD_PRIORITY } = require('../skills/eat');
+const memory = require('../memory');
 
 function countLogs(bot) {
   return countItemsMatching(bot, /(_log|_wood|_stem)$/);
@@ -32,9 +33,7 @@ function tableNearby(bot) {
 
 function countFood(bot) {
   if (!bot?.inventory?.items) return 0;
-  const foodSet = new Set([
-    ...FOOD_PRIORITY, 'raw_beef', 'raw_porkchop', 'raw_chicken', 'raw_mutton',
-  ]);
+  const foodSet = new Set(FOOD_PRIORITY);
   return bot.inventory.items().reduce((sum, it) => (foodSet.has(it.name) ? sum + it.count : sum), 0);
 }
 
@@ -52,6 +51,42 @@ function isNearOwner(bot, ctx, maxDist = 3) {
 
 function hasAnyItems(bot) {
   return Boolean(bot?.inventory?.items && bot.inventory.items().length > 0);
+}
+
+const isNearPos = (bot, p, maxDist) => Boolean(p && bot?.entity?.position?.distanceTo?.(p) <= maxDist);
+
+const isSolidAt = (bot, pos) => bot?.blockAt?.(pos)?.boundingBox === 'block';
+
+// Roof overhead and walls on all four sides at feet and head level (e.g. the bottom of a dig_in shaft).
+function isEnclosed(bot) {
+  const p = bot?.entity?.position?.floored?.();
+  if (!p?.offset) return false;
+  if (!isSolidAt(bot, p.offset(0, 2, 0))) return false;
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+    if (!isSolidAt(bot, p.offset(dx, 0, dz)) || !isSolidAt(bot, p.offset(dx, 1, dz))) return false;
+  }
+  return true;
+}
+
+// Autopilot gear progression, in order. Owning a better tier of the same thing counts.
+const UPGRADES = Object.freeze([
+  'stone_sword', 'stone_axe', 'iron_pickaxe', 'iron_sword', 'shield',
+  'iron_chestplate', 'iron_helmet', 'iron_leggings', 'iron_boots', 'diamond_pickaxe', 'diamond_sword',
+]);
+
+function owns(bot, name) {
+  const all = (bot?.inventory?.slots || bot?.inventory?.items?.() || []).filter(Boolean).map((it) => it.name);
+  const m = name.match(/^([a-z]+)_(\w+)$/);
+  const tier = m ? TOOL_TIERS.indexOf(m[1]) : -1;
+  if (tier < 0) return all.includes(name);
+  return all.some((n) => {
+    const o = n.match(/^([a-z]+)_(\w+)$/);
+    return o && o[2] === m[2] && TOOL_TIERS.indexOf(o[1]) >= tier;
+  });
+}
+
+function nextUpgrade(bot, skip = new Set()) {
+  return UPGRADES.find((n) => !skip.has(n) && !owns(bot, n)) || null;
 }
 
 const GOALS = {
@@ -91,8 +126,15 @@ const GOALS = {
     describe: 'emergency shelter for night',
     done: (b) => timeOfDayLabel(b.time?.timeOfDay) === 'day',
     steps: [
-      { skill: 'dig_in', need: (b) => ['dusk', 'night'].includes(timeOfDayLabel(b.time?.timeOfDay)) },
+      { skill: 'dig_in', need: (b) => ['dusk', 'night'].includes(timeOfDayLabel(b.time?.timeOfDay)) && !isEnclosed(b) },
+      { skill: 'wait_for_day', need: (b) => timeOfDayLabel(b.time?.timeOfDay) !== 'day' },
     ],
+  },
+
+  progress: {
+    describe: 'upgrade to better tools and armor',
+    done: (b) => !nextUpgrade(b),
+    steps: [],
   },
 
   follow_me: {
@@ -108,6 +150,30 @@ const GOALS = {
     done: (b, ctx) => isNearOwner(b, ctx, 3),
     steps: [
       { skill: 'come_to_owner', need: (b, ctx) => !isNearOwner(b, ctx, 3) },
+    ],
+  },
+
+  go_home: {
+    describe: 'walk back to the remembered home',
+    done: (b) => !memory.get().home || isNearPos(b, memory.get().home, 3),
+    steps: [
+      { skill: 'go_to', args: { place: 'home' }, need: () => true },
+    ],
+  },
+
+  recover_items: {
+    describe: "fetch the player's items from where they died",
+    done: () => !memory.get().deathSpot,
+    steps: [
+      { skill: 'recover_items', need: () => true },
+    ],
+  },
+
+  sleep_with_owner: {
+    describe: 'sleep when the player sleeps',
+    done: () => !require('../skills/sleep').isOwnerAsleep(),
+    steps: [
+      { skill: 'sleep_with_owner', need: (b) => require('../skills/sleep').isNight(b) },
     ],
   },
 
@@ -150,4 +216,8 @@ module.exports = {
   hasEdibleFood,
   isNearOwner,
   hasAnyItems,
+  isEnclosed,
+  owns,
+  nextUpgrade,
+  UPGRADES,
 };

@@ -114,12 +114,28 @@ test('craft.run: 3x3 tool craft requires table or walks to it', async () => {
   let visited = false;
   bot.findBlock = ({ maxDistance }) => (maxDistance <= 4 && !visited ? null : tableBlock);
   bot.pathfinder.goto = async () => { visited = true; };
-  bot.recipesFor = () => [{ result: { count: 1 } }];
+  bot.recipesFor = (id, meta, n, table) => (table ? [{ result: { count: 1 } }] : []); // like mineflayer: 3x3 needs a table
   bot.craft = async () => {};
 
   const res2 = await skills.craft.run(bot, {}, token, { item: 'wooden_pickaxe' });
   assert.equal(res2.ok, true);
   assert.equal(visited, true);
+});
+
+test('craft.run: 2x2 recipes (torch) and plank substitution need no table', async () => {
+  const bot = new FakeBot();
+  const token = new CancelToken();
+  const mc = require('minecraft-data')('1.20.4');
+  bot.findBlock = () => null;
+  const crafted = [];
+  // Only birch planks are craftable (bot holds birch logs); no table anywhere.
+  bot.recipesFor = (id, meta, n, table) => (!table && [mc.itemsByName.torch.id, mc.itemsByName.birch_planks.id].includes(id) ? [{ id, result: { count: 4 } }] : []);
+  bot.craft = async (r) => { crafted.push(mc.items[r.id].name); };
+
+  assert.equal((await skills.craft.run(bot, {}, token, { item: 'torch', count: 4 })).ok, true);
+  const res = await skills.craft.run(bot, {}, token, { item: 'oak_planks', runs: 1 });
+  assert.equal(res.ok, true);
+  assert.deepEqual(crafted, ['torch', 'birch_planks']);
 });
 
 test('place_block.run: finds solid ground and places block', async () => {

@@ -1,7 +1,7 @@
 'use strict';
 
 const FOOD_PRIORITY = Object.freeze([
-  'cooked_beef', 'cooked_porkchop', 'bread', 'cooked_chicken', 'cooked_mutton',
+  'cooked_beef', 'cooked_porkchop', 'bread', 'cooked_chicken', 'cooked_mutton', 'cooked_rabbit',
   'baked_potato', 'apple', 'carrot', 'beef', 'porkchop', 'mutton', 'chicken', 'rabbit',
 ]);
 
@@ -22,7 +22,9 @@ module.exports = {
   FOOD_PRIORITY,
 
   isAvailable(bot) {
-    if ((bot?.food ?? 20) >= 18) {
+    // Hurt bots top up to 20: full food + saturation is what drives fast healing.
+    const healing = (bot?.health ?? 20) <= 14 && (bot?.food ?? 20) < 20;
+    if ((bot?.food ?? 20) >= 18 && !healing) {
       return { ok: false, reason: 'not_hungry' };
     }
     const food = findBestFood(bot);

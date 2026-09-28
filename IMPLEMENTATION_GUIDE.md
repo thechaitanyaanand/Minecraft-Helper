@@ -15,8 +15,8 @@ Status: **Phases 0–2 done, plus the live view. Next: Phase 3.** See the progre
 | Live view | ✅ done | http://127.0.0.1:3000 (§8.7) — do not rebuild |
 | 2 Decision layer | ✅ done | `bot/src/decision/*`, intent + §12.3 gate wired, `!why` works |
 | 3 State builder | ✅ done | `bot/src/state/*`, name check + warm-up on spawn, 50 tests, tests no longer write to logs/ |
-| 4 Skills | ⏭ next | §10 — in 3 batches (§10.4a) |
-| 5–10 | ⬜ | §11 – §14B |
+| 4–10 | 🟡 built | Skills, planner, autopilot, obtain-anything, blueprints, buddy mode, combat (shield/bow), memory, Decider-only talk. 150 unit tests pass. **Not yet play-tested end to end in a live world.** |
+| 7 Eval | 🟡 | 175-line set incl. chat/remember/go_place. Decider alone 74.9%; with the keyword fallback for low-confidence `unclear` ≈ 88% (estimated from the eval misses). p50 ≈ 185 ms. Weakest: give_items, come_here, autopilot. |
 Target machine: the developer's Windows 11 laptop (details in §3).
 Nothing in this project is pushed or deployed to any cloud. See §0.2.
 
@@ -125,6 +125,7 @@ So the design splits the work:
 | Break a goal into steps (logs → planks → sticks → …) | **Deterministic code** (the recipe tree) |
 | Walking, mining, crafting, fighting | **Deterministic code** (Mineflayer and its plugins) |
 | All chat text the helper says | **Templates** (Decider cannot write text) |
+| Answer questions and small talk ("how do i find diamonds", "tell me a joke", "what do i like") | **Decider** picks one reply from a shortlist that code builds: canned knowledge (`chat/knowledge.js`), small talk, live facts, recipes read from minecraft-data, and saved memories (`chat/talk.js`) |
 
 **Golden rule:** the model only **chooses among options that code has already checked are possible.** It never outputs coordinates, item names or free text.
 
@@ -176,6 +177,14 @@ calibrated probabilities. A general 2B chat model would only add free-text repli
 - **Latency:** text generation takes seconds; one Decider pass takes ~100 ms.
 - **Wrong advice:** small chat models make up Minecraft recipes. New players cannot tell. Templates are always right.
 - **No calibration:** free text has no confidence number, so the §12.3 gate cannot work.
+
+**Decision (2026-09-27): conversation stays Decider-only.** General questions and small talk use a second, ~100 ms
+Decider pass that runs only for `explain` / `chat` / `unclear` messages. Code shortlists up to 12 candidate replies by keyword
+and typo-tolerant matching, the Decider picks one (or `none`), and a template speaks it. Recipe answers are generated
+from minecraft-data, so they are never made up. Memories (`bot/memory.json`: notes the player asked to remember,
+places, events such as deaths) are **not** put into the state, which is capped at 1500 chars. A memory becomes an answer
+option only when it matches the message, so the Decider decides whether to use it. To widen what the helper can talk
+about, add entries to `chat/knowledge.js`; no model change is needed.
 
 A smaller model helps only one way: `decider-0.8b` if VRAM runs out. Revisit a text model only if Phase 7
 logs show many real `explain` questions that templates cannot answer — then add it as an optional,
@@ -1132,8 +1141,8 @@ const GOALS = {
 };
 ```
 - `planksPotential = countPlanks + 4*countLogs`.
-- **Retry policy:** if a step fails, retry it at most 2 more times. On the 2nd failure with reason `no_target` (no trees or stone nearby), run `explore` once, then retry. After that, **fail the goal** and tell the player why, using a template.
-- **Infinite-loop guard:** a goal may run at most 25 steps. After that, fail with `too_many_steps`.
+- **Retry policy:** a step that fails with `no_target` / `no_path` / `stuck` triggers `explore` (up to 4 times per goal, each further out). Other failures retry the step up to 3 times, then **fail the goal** and tell the player why, using a template. A failed step whose inventory still changed (e.g. a timed-out collect that got 5 of 8 logs) counts as progress, not a failure.
+- **Infinite-loop guard:** a goal fails with `no_progress` after 8 steps in a row that changed nothing in the inventory. There is no fixed step budget (long chains like an iron pickaxe from scratch need 20+ steps); a 300-step runaway cap remains as a last resort (`too_many_steps`).
 - Unit test: with fake inventories, the first needed step is the expected one (table-driven tests).
 
 ### 11.2 Intents (the `intent` question)
@@ -1197,7 +1206,7 @@ runGoal():
   while !token.cancelled:
     if goal.done(bot): announce done; if autopilot → pickNextGoal() and continue; else mode='idle'; break
     step = first step with need(bot) true; if none → treat as done
-    if ++steps > 25 → fail('too_many_steps')
+    if 8 steps in a row changed no inventory → fail('no_progress')   (runaway cap: 300 steps)
     await checkInterrupts()        // may run eat/flee/fight/dig_in, then continue
     result = await runSkill(step)
     handle retries / explore / fail (§11.1)

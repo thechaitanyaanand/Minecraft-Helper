@@ -4,17 +4,21 @@ try { heuristics = require('../planner/heuristics'); } catch (_) {}
 
 const ADVERSARIAL_REGEX = /\b(ignore|disregard|jailbreak|swear|bypass|system prompt)\b/i;
 const INTENT_RULES = [
+  { intent: 'remember', regex: /^\s*(please\s+)?(remember|forget|yaad\s+rakh|note\s+(that|this))\b(?!.*\?\s*$)/i },
+  { intent: 'chat', regex: /\b(how are you|kaise ho|kya haal|who are you|your name|joke|thanks?|thank you|shukriya|love you|bye|good ?night|lol|haha|lmao|sorry|good job|well done|awesome|stupid|dumb|noob|bored)\b/i },
   { intent: 'stop', regex: /\b(stop|ruko|ruk|tham|stopp|wait|halt|freeze|cancel)\b/i },
-  { intent: 'status', regex: /\b(status|kya kar rahe|state|info|health|food do you have|how are you|what are you doing|what you are doing|current status|hal batao)\b/i },
+  { intent: 'status', regex: /\b(status|kya kar rahe|state|info|health|food do you have|what are you doing|what you are doing|current status|hal batao)\b/i },
   { intent: 'give_items', regex: /\b(give|drop|hand over|de do|dedo|saman|inventory|toss|maal|giv itms)\b/i },
   { intent: 'explain', regex: /\b(how\b|why\b|what is\b|what's\b|what are\b|what happens\b|explain\b|kaise\b|kya hai\b|kya kaam\b|kya hota\b|batao\b|tell me how)/i },
   { intent: 'follow_me', regex: /\b(follow|folow|piche|saath|aage|chal|stay with|walk behind|tag along|side|keep following)\b/i },
   { intent: 'come_here', regex: /\b(come here|cm here|idhar aao|mere paas aao|come over|come to|meet me|yahan aao|helper come|walk over)\b/i },
+  { intent: 'go_place', regex: /\b(take me|lead me|go to|le chalo|guide me)\b/i },
   { intent: 'survive_night', regex: /(night|dark|raat|shelter|safe|zombie|bachao|chupna|dusk|monsters)/i },
   { intent: 'make_tools', regex: /(pickaxe|picaxe|pikaxe|pick\b|tools?|axe\b|sword|hathoda|tools to stone)/i },
   { intent: 'get_wood', regex: /(wood|log|tree|lakdi|lakadi|chop|katna|wod|woood|choping)/i },
   { intent: 'get_food', regex: /(food|hungry|hungri|eat|khana|hunt|bhookh|bhuk|shikar|fod|chiken|khao|meat)/i },
-  { intent: 'autopilot', regex: /(auto|play for me|what do i do|dont know|don't know|idk|bored|khel|khelna|kuch karo|play by yourself|take over)/i },
+  { intent: 'autopilot', regex: /(auto|play for me|what do i do|dont know|don't know|idk|khel|khelna|kuch karo|play by yourself|take over)/i },
+  { intent: 'chat', regex: /\b(hi|hello|hey|yo|sup|namaste|nice|cool|ok|okay)\b/i }, // greetings lose to any real request
 ];
 
 function spreadProbabilities(options, chosen, chosenP) {
@@ -129,4 +133,10 @@ async function mockDecide(state, questions) {
   return { answers, latencyMs: Math.max(1, Date.now() - start), backend: 'mock', raw: { model: 'mock', answers } };
 }
 
-module.exports = { mockDecide, mockDecideSync };
+// First keyword rule that matches, or null. Used as a zero-latency second opinion when the Decider shrugs.
+function keywordIntent(msg = '') {
+  if (ADVERSARIAL_REGEX.test(msg)) return null;
+  return INTENT_RULES.find((r) => r.regex.test(msg))?.intent || null;
+}
+
+module.exports = { mockDecide, mockDecideSync, keywordIntent };

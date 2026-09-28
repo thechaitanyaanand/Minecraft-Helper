@@ -106,3 +106,27 @@ test('plan: group targets recognize non-oak logs and diverse food in inventory',
   assert.deepEqual(plan('group:food', 4, { cooked_porkchop: 4 }), []);
 });
 
+
+test('plan: uses tables/furnaces already in the world instead of crafting new ones', () => {
+  const steps = plan('stone_pickaxe', 1, { cobblestone: 3, stick: 2, placed_crafting_table: 1 });
+  assert.deepEqual(steps, [{ skill: 'craft', args: { item: 'stone_pickaxe', runs: 1 } }]);
+});
+
+test('plan: logs come from any tree, meat uses 1.20 item names, food hunts any animal', () => {
+  const logStep = plan('group:logs', 4, {})[0];
+  assert.ok(logStep.args.blockNames.includes('birch_log') && logStep.args.blockNames.includes('spruce_log'));
+  assert.equal(logStep.args.dropName, 'logs');
+
+  const beef = plan('cooked_beef', 1, { placed_furnace: 1, coal: 1 });
+  assert.deepEqual(beef.map((s) => s.skill), ['hunt', 'smelt']);
+  assert.deepEqual(plan('cooked_beef', 1, { beef: 1, coal: 1, placed_furnace: 1 }).map((s) => s.skill), ['smelt']);
+
+  const food = plan('group:food', 4, {});
+  assert.equal(food[0].skill, 'hunt');
+  assert.ok(food[0].args.mobNames.includes('pig') && food[0].args.mobNames.includes('chicken'));
+});
+
+test('plan: ore collection counts the drop (raw_iron), not the ore block', () => {
+  const step = plan('raw_iron', 2, { stone_pickaxe: 1 })[0];
+  assert.equal(step.args.dropName, 'raw_iron');
+});

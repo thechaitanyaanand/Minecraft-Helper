@@ -16,16 +16,25 @@ function countTarget(bot, dropName, blockNames) {
   return 0;
 }
 
+const JUNK = /^(gravel|sand|granite|diorite|andesite|tuff|calcite|netherrack|rotten_flesh|wheat_seeds|poisonous_potato|flint)$/;
+
+const freeSlotCount = (bot) => (typeof bot?.inventory?.emptySlotCount === 'function'
+  ? bot.inventory.emptySlotCount()
+  : 36 - (bot?.inventory?.items ? bot.inventory.items().length : 0));
+
+async function tossJunk(bot) {
+  for (const it of bot.inventory?.items?.() || []) {
+    if (JUNK.test(it.name) && bot.toss) { try { await bot.toss(it.type, null, it.count); } catch (_) {} }
+  }
+}
+
 module.exports = {
   name: 'collect_block',
   describe: 'collect natural blocks from the world',
   timeoutMs: 90_000,
 
   isAvailable(bot, ctx, args = {}) {
-    const freeSlots = typeof bot?.inventory?.emptySlotCount === 'function'
-      ? bot.inventory.emptySlotCount()
-      : 36 - (bot?.inventory?.items ? bot.inventory.items().length : 0);
-    if (freeSlots <= 2) return { ok: false, reason: 'inventory_full' };
+    if (freeSlotCount(bot) <= 2) return { ok: false, reason: 'inventory_full' };
     if (args.needsTool && bestToolTier(bot, args.needsTool) === 'none') {
       return { ok: false, reason: 'no_tool' };
     }
@@ -35,11 +44,9 @@ module.exports = {
   async run(bot, ctx, token, args = {}) {
     token.throwIfCancelled();
 
-    // Inventory check: if <= 2 free slots -> inventory_full
-    const freeSlots = typeof bot?.inventory?.emptySlotCount === 'function'
-      ? bot.inventory.emptySlotCount()
-      : 36 - (bot?.inventory?.items ? bot.inventory.items().length : 0);
-    if (freeSlots <= 2) {
+    // Inventory check: toss junk first, only give up if still <= 2 free slots
+    if (freeSlotCount(bot) <= 2) await tossJunk(bot);
+    if (freeSlotCount(bot) <= 2) {
       return { ok: false, reason: 'inventory_full' };
     }
 

@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 520" width="1000" height="520" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+  </defs>
+  <rect width="1000" height="520" fill="#ffffff"/>
+  <text x="500" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Conversation without text generation</text>
+  <text x="500" y="60" text-anchor="middle" font-size="13" fill="#64748b">Code builds and ranks candidate replies; the Decider only picks one (or "none").</text>
+
+  <!-- sources -->
+  <g font-size="12">
+    <rect x="30" y="90" width="230" height="58" rx="8" fill="#eff6ff" stroke="#3b82f6"/>
+    <text x="145" y="114" text-anchor="middle" font-weight="700" fill="#1e3a8a">Knowledge (47 topics)</text>
+    <text x="145" y="134" text-anchor="middle" fill="#1e40af">diamonds, nether, creepers, farming…</text>
+
+    <rect x="30" y="158" width="230" height="58" rx="8" fill="#ecfdf5" stroke="#10b981"/>
+    <text x="145" y="182" text-anchor="middle" font-weight="700" fill="#065f46">Small talk (14 kinds)</text>
+    <text x="145" y="202" text-anchor="middle" fill="#047857">jokes, thanks, "how are you"…</text>
+
+    <rect x="30" y="226" width="230" height="58" rx="8" fill="#fff7ed" stroke="#f97316"/>
+    <text x="145" y="250" text-anchor="middle" font-weight="700" fill="#7c2d12">Live facts</text>
+    <text x="145" y="270" text-anchor="middle" fill="#9a3412">inventory, time to night, location</text>
+
+    <rect x="30" y="294" width="230" height="58" rx="8" fill="#fefce8" stroke="#eab308"/>
+    <text x="145" y="318" text-anchor="middle" font-weight="700" fill="#713f12">Recipe from game data</text>
+    <text x="145" y="338" text-anchor="middle" fill="#854d0e">minecraft-data: craft / smelt / mine / mob</text>
+
+    <rect x="30" y="362" width="230" height="58" rx="8" fill="#f1f5f9" stroke="#64748b"/>
+    <text x="145" y="386" text-anchor="middle" font-weight="700" fill="#1e293b">Memories</text>
+    <text x="145" y="406" text-anchor="middle" fill="#334155">notes, deaths, places (memory.json)</text>
+  </g>
+
+  <!-- funnel -->
+  <path d="M320 100 L560 180 L560 340 L320 420 Z" fill="#f8fafc" stroke="#94a3b8" stroke-width="2"/>
+  <text x="440" y="222" text-anchor="middle" font-size="14" font-weight="700" fill="#1e293b">Score &amp; shortlist</text>
+  <text x="440" y="246" text-anchor="middle" font-size="12" fill="#334155">+1 per keyword-phrase word hit</text>
+  <text x="440" y="266" text-anchor="middle" font-size="12" fill="#334155">+ best trigram typo match (≥ 0.5)</text>
+  <text x="440" y="286" text-anchor="middle" font-size="12" fill="#334155">keep score ≥ 0.5, top 12</text>
+  <text x="440" y="310" text-anchor="middle" font-size="11" fill="#64748b">"diamons kahan" still finds diamonds</text>
+
+  <!-- decider -->
+  <rect x="610" y="190" width="170" height="140" rx="12" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="695" y="222" text-anchor="middle" font-size="15" font-weight="700" fill="#4c1d95">Decider</text>
+  <text x="695" y="246" text-anchor="middle" font-size="12" fill="#5b21b6">one choice question</text>
+  <text x="695" y="266" text-anchor="middle" font-size="12" fill="#5b21b6">options = candidate ids</text>
+  <text x="695" y="286" text-anchor="middle" font-size="12" fill="#5b21b6">+ "none of these fit"</text>
+  <text x="695" y="312" text-anchor="middle" font-size="11" fill="#6d28d9">skipped if 1 strong option</text>
+
+  <!-- output -->
+  <rect x="820" y="160" width="160" height="90" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+  <text x="900" y="188" text-anchor="middle" font-size="13" font-weight="700" fill="#065f46">Say the reply</text>
+  <text x="900" y="210" text-anchor="middle" font-size="11" fill="#047857">template text,</text>
+  <text x="900" y="226" text-anchor="middle" font-size="11" fill="#047857">≤ 240 chars</text>
+
+  <rect x="820" y="270" width="160" height="90" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
+  <text x="900" y="298" text-anchor="middle" font-size="13" font-weight="700" fill="#7c2d12">Maybe offer</text>
+  <text x="900" y="320" text-anchor="middle" font-size="11" fill="#9a3412">"Want me to get one?</text>
+  <text x="900" y="336" text-anchor="middle" font-size="11" fill="#9a3412">(yes/no)" → a goal</text>
+
+  <g stroke="#475569" stroke-width="2" fill="none" marker-end="url(#a)">
+    <line x1="260" y1="119" x2="318" y2="150"/>
+    <line x1="260" y1="187" x2="318" y2="205"/>
+    <line x1="260" y1="255" x2="318" y2="260"/>
+    <line x1="260" y1="323" x2="318" y2="315"/>
+    <line x1="260" y1="391" x2="318" y2="370"/>
+    <line x1="560" y1="260" x2="606" y2="260"/>
+    <line x1="780" y1="240" x2="816" y2="210"/>
+    <line x1="780" y1="280" x2="816" y2="310"/>
+  </g>
+
+  <!-- example strip -->
+  <rect x="30" y="448" width="940" height="52" rx="10" fill="#f8fafc" stroke="#e2e8f0"/>
+  <text x="50" y="470" font-size="12" font-weight="700" fill="#0f172a">Example</text>
+  <text x="50" y="489" font-size="12" fill="#334155">"how to make a bucket" → [how_bucket 2.5, kb_bucket 2.0, none] → picks how_bucket → "Bucket: 3 iron ingots at a crafting table. Want me to get one?"</text>
+</svg>

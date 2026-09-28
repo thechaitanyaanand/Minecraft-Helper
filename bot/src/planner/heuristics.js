@@ -1,4 +1,24 @@
 'use strict';
+const { FOOD_PRIORITY } = require('../skills/eat');
+const { RANGED_MOBS } = require('../state/world');
+
+// buildState's inventory is a name->count map; older callers pass has_food/logs directly.
+const hasFood = (state) => Boolean(state?.inventory?.has_food || state?.has_food ||
+  Object.keys(state?.inventory || {}).some((k) => FOOD_PRIORITY.includes(k)));
+const logCount = (state) => state?.inventory?.logs ??
+  Object.entries(state?.inventory || {}).reduce((n, [k, v]) => (/(_log|_wood|_stem)$/.test(k) ? n + v : n), 0);
+
+// Worth fighting: melee range normally; creepers only behind a shield; skeletons from afar with a bow.
+function canFight(state, h) {
+  if (!h || (state?.health ?? 20) <= 10) return false;
+  const dist = h.distance ?? 999, type = h.type || h.name || '';
+  if (type === 'creeper') return Boolean(state?.tools?.shield) && dist <= 5;
+  if (RANGED_MOBS.has(type) && state?.tools?.bow) return dist <= 16;
+  return dist <= 5;
+}
+
+// Eat when hungry, or top up to full when hurt: a full food bar with saturation regenerates health fast.
+const wantsToEat = (state) => (state?.food ?? 20) < 14 || ((state?.health ?? 20) <= 14 && (state?.food ?? 20) < 20);
 
 /**
  * Hard safety overrides that run before any model call (§11.3).
@@ -22,8 +42,8 @@ function safetyOverride(state) {
     const dist = typeof h.distance === 'number' ? h.distance : 999;
     const type = h.type || h.name || '';
 
-    // Creeper <= 4 blocks -> instant flee
-    if (type === 'creeper' && dist <= 4) {
+    // Creeper <= 4 blocks -> instant flee, unless we can block the blast and fight it
+    if (type === 'creeper' && dist <= 4 && !canFight(state, h)) {
       return 'flee';
     }
 
@@ -63,25 +83,23 @@ function interrupt(state, criteriaOrOptions) {
   const hostileDist = nearestHostile ? (nearestHostile.distance ?? 999) : 999;
   const hostileType = nearestHostile ? (nearestHostile.type || nearestHostile.name || '') : '';
 
-  // Hostile <= 5 blocks, health > 10, not a creeper -> fight
-  if (isLegal('fight') && hostileDist <= 5 && (state?.health ?? 20) > 10 && hostileType !== 'creeper') {
+  if (isLegal('fight') && canFight(state, nearestHostile)) {
     return 'fight';
   }
 
-  // Hostile <= 10 blocks -> flee
-  if (isLegal('flee') && hostileDist <= 10) {
+  // Flee from a creeper we can't block, or from anything when too hurt to fight. A healthy bot keeps working and fights at <= 5.
+  if (isLegal('flee') && hostileDist <= 10 && ((hostileType === 'creeper' && !canFight(state, nearestHostile)) || (state?.health ?? 20) <= 10)) {
     return 'flee';
   }
 
-  // Dig in if night/dusk or >= 3 hostiles within 16
-  const isNight = state?.time_of_day === 'night' || state?.time_of_day === 'dusk';
+  // Dig in if >= 3 hostiles within 16
   const hostileCount = hostiles.filter((h) => (h.distance ?? 999) <= 16).length;
-  if (isLegal('dig_in') && (isNight || hostileCount >= 3)) {
+  if (isLegal('dig_in') && hostileCount >= 3) {
     return 'dig_in';
   }
 
-  // Eat food if food < 14
-  if (isLegal('eat_food') && (state?.food ?? 20) < 14) {
+  // Eat when hungry or to heal up
+  if (isLegal('eat_food') && wantsToEat(state)) {
     return 'eat_food';
   }
 
@@ -124,12 +142,14 @@ function nextGoal(state, criteriaOrOptions) {
   }
 
   // 4. Logs < 8 -> get_wood
-  const logCount = state?.inventory?.logs || 0;
-  if (logCount < 8 && isAvailable('get_wood')) {
+  if (logCount(state) < 8 && isAvailable('get_wood')) {
     return 'get_wood';
   }
 
-  // 5. Default
+  // 5. Basics covered -> work toward better gear
+  if (isAvailable('progress')) return 'progress';
+
+  // 6. Default
   if (isAvailable('get_food')) return 'get_food';
   if (isAvailable('get_wood')) return 'get_wood';
   return allowed?.[0] || 'get_wood';
@@ -146,18 +166,22 @@ function getLegalInterrupts(state) {
   const hostileDist = nearestHostile ? (nearestHostile.distance ?? 999) : 999;
   const hostileType = nearestHostile ? (nearestHostile.type || nearestHostile.name || '') : '';
 
-  if (food < 14 && (state?.inventory?.has_food || state?.has_food)) legal.push('eat_food');
-  if (hostileDist <= 10) legal.push('flee');
-  if (hostileDist <= 5 && health > 10 && hostileType !== 'creeper') legal.push('fight');
-  const isNight = state?.time_of_day === 'night' || state?.time_of_day === 'dusk';
-  if (isNight || hostiles.filter((h) => (h.distance ?? 999) <= 16).length >= 3) legal.push('dig_in');
-  if (food < 10 && !(state?.inventory?.has_food || state?.has_food)) legal.push('get_food');
+  if (wantsToEat(state) && hasFood(state)) legal.push('eat_food');
+  // Only offer running away when fighting isn't a sure thing: otherwise the model sometimes picks "run" over "fight"
+  // for a lone zombie, and a buddy that flees from zombies is no buddy.
+  const outnumbered = hostiles.filter((h) => (h.distance ?? 999) <= 10).length >= 3;
+  if (canFight(state, nearestHostile)) legal.push('fight');
+  if (hostileDist <= 10 && (!legal.includes('fight') || outnumbered)) legal.push('flee');
+  // Night alone is not a reason to abandon a task (autopilot has its own survive_night goal); being swarmed is.
+  if (hostiles.filter((h) => (h.distance ?? 999) <= 16).length >= 3) legal.push('dig_in');
+  if (food < 10 && !hasFood(state)) legal.push('get_food');
 
   return legal;
 }
 
 module.exports = {
   safetyOverride,
+  canFight,
   interrupt,
   nextGoal,
   getLegalInterrupts,

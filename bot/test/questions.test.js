@@ -12,7 +12,7 @@ test('questions.intent: builds intent choice and wants_to_learn noul', () => {
   assert.equal(q.wants_to_learn.type, 'noul');
 
   const criteriaKeys = Object.keys(q.intent.criteria);
-  assert.equal(criteriaKeys.length, 12);
+  assert.equal(criteriaKeys.length, 15);
   assert.ok(criteriaKeys.includes('get_wood'));
   assert.ok(criteriaKeys.includes('make_tools'));
   assert.ok(criteriaKeys.includes('get_food'));

@@ -1,21 +1,58 @@
 'use strict';
 
-function matchTopic(text = '') {
-  const t = String(text).toLowerCase();
-  if (/crafting|table|workbench|desk/i.test(t)) return 'crafting_table';
-  if (/pickaxe|pick|stone|tool|hathoda/i.test(t)) return 'pickaxe';
-  if (/night|dark|raat|monster|zombie|creeper|skeleton|shelter|dusk/i.test(t)) return 'night';
-  if (/food|hungry|eat|hunger|khana|starv|meat/i.test(t)) return 'food';
-  return t.replace(/\s+/g, '_');
+const pretty = (name = '') => String(name).replace(/^group:/, '').replace(/_/g, ' ');
+
+// 'obtain:stone_pickaxe:1' -> 'stone pickaxe', 'blueprint:hut_5x5' -> 'hut 5x5', 'mob:zombie' -> 'zombie'
+function goalLabel(goalId = '') {
+  if (String(goalId).startsWith('goto:')) return 'the trip';
+  const m = String(goalId).match(/^obtain:(.+):\d+$/);
+  if (m) return pretty(m[1]);
+  return pretty(String(goalId).replace(/^(blueprint|mob|obtain):/, ''));
+}
+
+function describeStep(s) {
+  const a = s.args || {};
+  if (s.skill === 'collect_block') return `gather ${a.count} ${pretty(a.dropName || a.blockNames?.[0])}`;
+  if (s.skill === 'hunt') return `hunt ${a.mobNames?.length > 2 ? 'animals' : pretty(a.mobNames?.[0])}`;
+  if (s.skill === 'craft') return /_(pickaxe|axe|sword|shovel)$|^furnace$/.test(a.item) ? `craft ${pretty(a.item)}` : null;
+  if (s.skill === 'smelt') return `smelt ${pretty(a.item)}`;
+  return null;
 }
 
 const templates = {
+  goalLabel,
+
+  planSummary(target, count, steps = []) {
+    if (!steps.length) return '';
+    const name = `${count > 1 ? `${count} ` : ''}${pretty(target)}`;
+    if (!steps.some((s) => s.skill === 'collect_block' || s.skill === 'hunt')) return `I already have the materials — making ${name} now.`;
+    const parts = [];
+    for (const s of steps) { const d = describeStep(s); if (d && !parts.includes(d)) parts.push(d); }
+    const final = `craft ${pretty(target)}`;
+    if (steps[steps.length - 1]?.skill === 'craft' && !parts.includes(final)) parts.push(final);
+    return `Getting ${name}: ${parts.join(' > ')}`;
+  },
+
+  obtained(target, count, gave) {
+    const name = `${count > 1 ? `${count} ` : ''}${pretty(target)}`;
+    return gave ? `Here you go — ${name}!` : `Got ${name}.`;
+  },
+
+  goalDone(goalId) {
+    if (goalId === 'survive_night') return 'Morning! Safe to head out.';
+    if (goalId === 'go_home') return 'Home sweet home!';
+    if (goalId === 'sleep_with_owner') return 'Good morning!';
+    if (goalId.startsWith('goto:')) return 'Here we are!';
+    if (['come_here', 'follow_me', 'give_items', 'recover_items'].includes(goalId)) return '';
+    return `Done with ${goalLabel(goalId)}.`;
+  },
+
   welcome(name) {
     return `Hi ${name}! I'm your helper. Tell me what you want in normal words, starting with "helper". Try: "helper get wood", "helper make a pickaxe", "helper play for me". Type !stop to stop me, !help for more.`;
   },
 
   help() {
-    return 'Commands: !help (this list), !stop (stop immediately), !come (walk to you), !follow (follow you), !status (health & current task), !auto (autopilot), !why (explain last decision), !give (give items).';
+    return 'Commands: !stop, !come, !follow, !give, !status, !auto, !why, !kit, !sethome, !home, !stuff (fetch your items after dying), !where (home, chests, death spot). Or just talk: "helper get wood".';
   },
 
   status({ health = 20, food = 20, timeOfDay = 'day', activity = 'idle', backend = 'mock' } = {}) {
@@ -42,6 +79,7 @@ const templates = {
   },
 
   announceGoal(goalId, learn = false) {
+    if (goalId.startsWith('goto:')) return ''; // talk.goPlace already said where
     if (learn) {
       const learnMap = {
         get_wood: 'Logs make planks, which craft sticks and tools. Punch tree trunks to gather logs!',
@@ -59,9 +97,12 @@ const templates = {
       follow_me: '',
       come_here: '',
       give_items: 'Dropping items for you.',
+      go_home: 'Heading home.',
+      sleep_with_owner: 'Bedtime? Coming to sleep too!',
+      recover_items: 'Going to fetch your stuff from where you died!',
       autopilot: 'Autopilot enabled! Surviving and gathering resources.',
     };
-    return map[goalId] ?? `Starting task: ${goalId}`;
+    return map[goalId] ?? `On it: ${goalLabel(goalId)}.`;
   },
 
   stepStart(skill, args = {}, learn = false) {
@@ -146,26 +187,17 @@ const templates = {
       case 'owner_not_found':
         return 'I can\'t see you — please come closer (within ~60 blocks).';
       case 'too_many_steps':
-        return 'This task exceeded maximum step limit. Stopping for safety.';
+      case 'no_progress':
+        return `I keep going in circles on ${pretty(skill)} without making progress, so I'm stopping. Try helping me get closer to the materials.`;
       case 'no_source':
         return 'I don\'t know how to obtain that item yet.';
       case 'too_deep':
         return 'Recipe is too complex or circular to plan.';
       default:
-        return `Couldn't complete ${skill}: ${String(reason || 'unknown issue').replace(/_/g, ' ')}.`;
+        return `Couldn't complete ${pretty(skill)}: ${String(reason || 'unknown issue').replace(/_/g, ' ')}.`;
     }
   },
 
-  explain(topic = '') {
-    const key = matchTopic(topic);
-    const map = {
-      crafting_table: 'A crafting table gives you a 3x3 crafting grid. Put 4 wood planks in your 2x2 inventory grid (E) to make one.',
-      pickaxe: 'A wooden pickaxe mines stone for durable stone tools. Bare hands cannot mine stone blocks.',
-      night: 'At night, hostile monsters (zombies, skeletons, creepers) spawn in the dark. Sleep in a bed or hide in a shelter until dawn.',
-      food: 'When hunger drops below 18, you stop healing. At 0, you take starvation damage. Hunt animals and eat meat to restore it.',
-    };
-    return map[key] || 'Ask me about: crafting_table, pickaxe, night, or food.';
-  },
 };
 
 module.exports = templates;

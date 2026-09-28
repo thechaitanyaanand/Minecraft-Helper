@@ -11,7 +11,9 @@ const { comeToOwner, followOwner, giveToOwner } = require('./owner');
 const explore = require('./explore');
 const smelt = require('./smelt');
 const buildBlueprint = require('./buildBlueprint');
-const { FOOD_MOBS } = require('../state/world');
+const { goTo, recoverItems } = require('./places');
+const sleep = require('./sleep');
+const { FOOD_MOBS, timeOfDayLabel } = require('../state/world');
 
 const ALL_LOG_NAMES = Object.freeze([
   'oak_log', 'spruce_log', 'birch_log', 'jungle_log',
@@ -34,6 +36,9 @@ const skills = {
   explore,
   smelt,
   build_blueprint: buildBlueprint,
+  go_to: goTo,
+  recover_items: recoverItems,
+  sleep_with_owner: sleep,
 };
 
 const aliases = {
@@ -100,6 +105,18 @@ const aliases = {
       name: 'crafting_table',
       ...args,
     }),
+  },
+  wait_for_day: {
+    name: 'wait_for_day',
+    describe: 'stay put in the shelter until morning',
+    timeoutMs: 0,
+    run: async (bot, ctx, token) => {
+      while (timeOfDayLabel(bot.time?.timeOfDay) !== 'day') {
+        token.throwIfCancelled();
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+      return { ok: true, message: 'morning' };
+    },
   },
   hunt_food: {
     name: 'hunt_food',

@@ -9,7 +9,10 @@ const INTENT_CRITERIA = Object.freeze({
   come_here: 'walk to where the player is',
   give_items: 'give the player items the helper has',
   autopilot: 'play by itself and decide what to do next',
-  explain: 'player asks how or why something works, no action',
+  explain: 'player asks a question about Minecraft or the helper, no action',
+  chat: 'small talk: greeting, thanks, joke, feelings or a reaction',
+  remember: 'player asks the helper to remember or forget something',
+  go_place: 'go to a named or remembered place like home, the base or a farm',
   stop: 'stop what the helper is doing',
   status: 'player asks what the helper is doing or has',
   unclear: 'message is not a request or is unclear',
@@ -123,6 +126,14 @@ function buildBuddyQuestions(legalActions) {
   return q;
 }
 
+// One choice among options code has prepared ({ id, about }), plus a way out.
+function buildAnswerQuestions(options, instructions) {
+  const criteria = {};
+  for (const o of options) criteria[o.id] = o.about;
+  criteria.none = 'none of these fit';
+  return { answer: { type: 'choice', instructions, criteria } };
+}
+
 function buildSlotQuestions() {
   return {
     verb: { type: 'choice', instructions: 'What kind of help does the player want?', criteria: { ...VERB_CRITERIA } },
@@ -135,5 +146,5 @@ module.exports = {
   INTENT_CRITERIA, INTERRUPT_CRITERIA, NEXT_GOAL_CRITERIA, OWNER_ACTIVITY_CRITERIA,
   BUDDY_ACTION_CRITERIA, VERB_CRITERIA, CATEGORY_CRITERIA,
   intent: buildIntentQuestions, interrupt: buildInterruptQuestions,
-  next_goal: buildNextGoalQuestions, buddy: buildBuddyQuestions, slots: buildSlotQuestions,
+  next_goal: buildNextGoalQuestions, buddy: buildBuddyQuestions, slots: buildSlotQuestions, answer: buildAnswerQuestions,
 };

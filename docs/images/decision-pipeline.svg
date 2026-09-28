@@ -1,0 +1,82 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 620" width="1000" height="620" font-family="Segoe UI, Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#475569"/></marker>
+  </defs>
+  <rect width="1000" height="620" fill="#ffffff"/>
+  <text x="500" y="36" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">From a chat message to an action</text>
+  <text x="500" y="60" text-anchor="middle" font-size="13" fill="#64748b">The model only ever chooses among options code has already built and checked.</text>
+
+  <g font-size="13">
+    <!-- 1 message -->
+    <rect x="40" y="90" width="220" height="64" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="150" y="117" text-anchor="middle" font-weight="700" fill="#065f46">Owner types</text>
+    <text x="150" y="138" text-anchor="middle" fill="#065f46">"helper lakdi chahiye"</text>
+
+    <!-- 2 router -->
+    <rect x="310" y="90" width="220" height="64" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+    <text x="420" y="117" text-anchor="middle" font-weight="700" fill="#1e293b">Router</text>
+    <text x="420" y="138" text-anchor="middle" fill="#334155">owner only · prefix · !commands</text>
+
+    <!-- 3 fast paths -->
+    <rect x="580" y="90" width="380" height="64" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>
+    <text x="770" y="117" text-anchor="middle" font-weight="700" fill="#1e293b">Exact fast paths (regex, 0 ms)</text>
+    <text x="770" y="138" text-anchor="middle" fill="#334155">"come", "stop", "set home", "get my stuff" …</text>
+
+    <!-- 4 intent pass -->
+    <rect x="310" y="200" width="380" height="96" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="500" y="228" text-anchor="middle" font-weight="700" fill="#4c1d95">Decider pass 1: intent (~185 ms)</text>
+    <text x="500" y="250" text-anchor="middle" fill="#5b21b6">state JSON (≤ 1500 chars) + choice over 15 intents</text>
+    <text x="500" y="270" text-anchor="middle" fill="#5b21b6">→ choice, confidence, full probability table</text>
+    <text x="500" y="288" text-anchor="middle" font-size="11" fill="#6d28d9">backend down? → mock keyword rules, same shape</text>
+
+    <!-- 5 fallback -->
+    <rect x="740" y="210" width="220" height="76" rx="10" fill="#fefce8" stroke="#eab308" stroke-width="2"/>
+    <text x="850" y="236" text-anchor="middle" font-weight="700" fill="#713f12">Keyword second opinion</text>
+    <text x="850" y="256" text-anchor="middle" font-size="12" fill="#854d0e">only if "unclear" &lt; 0.6</text>
+    <text x="850" y="274" text-anchor="middle" font-size="12" fill="#854d0e">Hinglish, typos</text>
+
+    <!-- 6 branches -->
+    <rect x="40" y="350" width="280" height="110" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
+    <text x="180" y="378" text-anchor="middle" font-weight="700" fill="#7c2d12">Act: task intents</text>
+    <text x="180" y="400" text-anchor="middle" fill="#9a3412">confidence gate</text>
+    <text x="180" y="420" text-anchor="middle" font-size="12" fill="#9a3412">≥ 0.70 act · 0.45–0.70 "did you mean…?"</text>
+    <text x="180" y="440" text-anchor="middle" font-size="12" fill="#9a3412">&lt; 0.45 "pick one: 1) 2) 3)"</text>
+
+    <rect x="360" y="350" width="280" height="110" rx="10" fill="#f5f3ff" stroke="#8b5cf6" stroke-width="2"/>
+    <text x="500" y="378" text-anchor="middle" font-weight="700" fill="#4c1d95">Talk: explain / chat / unclear</text>
+    <text x="500" y="400" text-anchor="middle" fill="#5b21b6">Decider pass 2 picks a reply</text>
+    <text x="500" y="420" text-anchor="middle" font-size="12" fill="#5b21b6">from ≤ 12 shortlisted candidates</text>
+    <text x="500" y="440" text-anchor="middle" font-size="12" fill="#5b21b6">(knowledge, facts, recipes, memories)</text>
+
+    <rect x="680" y="350" width="280" height="110" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+    <text x="820" y="378" text-anchor="middle" font-weight="700" fill="#1e293b">Memory: remember / go_place</text>
+    <text x="820" y="400" text-anchor="middle" fill="#334155">store a note (+ position)</text>
+    <text x="820" y="420" text-anchor="middle" font-size="12" fill="#334155">or Decider picks one of the</text>
+    <text x="820" y="440" text-anchor="middle" font-size="12" fill="#334155">remembered places → walk there</text>
+
+    <!-- 7 planner -->
+    <rect x="40" y="510" width="600" height="80" rx="10" fill="#fff7ed" stroke="#f97316" stroke-width="2"/>
+    <text x="340" y="538" text-anchor="middle" font-weight="700" fill="#7c2d12">Planner → deterministic steps → skills</text>
+    <text x="340" y="560" text-anchor="middle" fill="#9a3412">obtain oak_log ×8: recipe tree from minecraft-data → collect_block → craft …</text>
+    <text x="340" y="578" text-anchor="middle" font-size="12" fill="#9a3412">walking, mining, crafting, fighting are plain code (Mineflayer), never the model</text>
+
+    <rect x="680" y="510" width="280" height="80" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
+    <text x="820" y="538" text-anchor="middle" font-weight="700" fill="#065f46">Templates speak</text>
+    <text x="820" y="560" text-anchor="middle" font-size="12" fill="#047857">all chat text is written by code,</text>
+    <text x="820" y="578" text-anchor="middle" font-size="12" fill="#047857">≤ 240 chars, never by the model</text>
+  </g>
+
+  <g stroke="#475569" stroke-width="2" fill="none" marker-end="url(#a)">
+    <line x1="260" y1="122" x2="306" y2="122"/>
+    <line x1="530" y1="122" x2="576" y2="122"/>
+    <line x1="420" y1="154" x2="460" y2="196"/>
+    <path d="M690 232 L736 232"/>
+    <path d="M740 268 L694 268"/>
+    <path d="M400 296 L200 346"/>
+    <path d="M500 296 L500 346"/>
+    <path d="M600 296 L800 346"/>
+    <path d="M180 460 L180 506"/>
+    <path d="M640 460 L760 506"/>
+    <path d="M820 460 L820 506"/>
+  </g>
+</svg>

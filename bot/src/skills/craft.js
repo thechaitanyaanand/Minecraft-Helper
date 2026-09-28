@@ -16,72 +16,57 @@ module.exports = {
     const mcData = require('minecraft-data')(bot?.version || '1.20.4');
     let itemName = args.item || 'oak_planks';
     const count = args.count || 1;
+    // Any plank type satisfies a planks request (planner says oak, bot may only hold birch logs).
+    const names = itemName.endsWith('_planks') || itemName === 'planks' ? [...new Set([itemName, ...PLANK_TYPES])].filter((n) => n !== 'planks') : [itemName];
+    if (!mcData.itemsByName[names[0]]) return { ok: false, reason: 'unknown_item', message: `Unknown item: ${itemName}` };
 
-    // For generic 'planks', find the log type the bot owns and pick that plank type
-    if (itemName === 'planks') {
-      let foundPlank = null;
-      for (const pName of PLANK_TYPES) {
-        const it = mcData.itemsByName[pName];
-        if (it && bot.recipesFor && bot.recipesFor(it.id, null, 1, null).length > 0) {
-          foundPlank = pName;
-          break;
-        }
+    const findRecipe = (table) => {
+      for (const n of names) {
+        const r = bot.recipesFor ? bot.recipesFor(mcData.itemsByName[n].id, null, 1, table) : [];
+        if (r?.length) { itemName = n; return r[0]; }
       }
-      if (!foundPlank) {
-        return { ok: false, reason: 'no_recipe_or_missing_items' };
-      }
-      itemName = foundPlank;
-    }
+      return null;
+    };
 
-    const item = mcData.itemsByName[itemName];
-    if (!item) {
-      return { ok: false, reason: 'unknown_item', message: `Unknown item: ${itemName}` };
-    }
-
-    // Check if 2x2 craft (no table required)
-    const is2x2 = itemName.endsWith('_planks') || itemName === 'stick' || itemName === 'crafting_table';
+    // 2x2 inventory grid first; only walk to a crafting table if the recipe needs one.
     let table = null;
-
-    if (!is2x2) {
-      // Tools and 3x3 items require a crafting table within reach (<= 4 blocks)
+    let recipe = findRecipe(null);
+    if (!recipe) {
       const tableId = mcData.blocksByName.crafting_table?.id;
-      if (typeof tableId === 'number' && bot.findBlock) {
-        table = bot.findBlock({ matching: tableId, maxDistance: 4 });
-
-        if (!table) {
-          // Check if table exists within 32 blocks and walk to it
-          const distantTable = bot.findBlock({ matching: tableId, maxDistance: 32 });
-          if (!distantTable) {
-            return { ok: false, reason: 'no_table' };
-          }
-          if (bot.pathfinder?.goto) {
-            token.throwIfCancelled();
-            const p = distantTable.position;
-            await bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 2));
-            token.throwIfCancelled();
-          }
-          table = bot.findBlock({ matching: tableId, maxDistance: 4 });
-          if (!table) {
-            return { ok: false, reason: 'no_table' };
-          }
+      table = bot.findBlock ? bot.findBlock({ matching: tableId, maxDistance: 4 }) : null;
+      if (!table) {
+        const distantTable = bot.findBlock ? bot.findBlock({ matching: tableId, maxDistance: 32 }) : null;
+        if (!distantTable) return { ok: false, reason: 'no_table' };
+        if (bot.pathfinder?.goto) {
+          token.throwIfCancelled();
+          const p = distantTable.position;
+          await bot.pathfinder.goto(new goals.GoalNear(p.x, p.y, p.z, 2));
+          token.throwIfCancelled();
         }
-      } else {
-        return { ok: false, reason: 'no_table' };
+        table = bot.findBlock({ matching: tableId, maxDistance: 4 });
+        if (!table) return { ok: false, reason: 'no_table' };
       }
+      recipe = findRecipe(table);
     }
+    if (!recipe) return { ok: false, reason: 'no_recipe_or_missing_items' };
 
-    const recipes = bot.recipesFor ? bot.recipesFor(item.id, null, 1, table || null) : [];
-    if (!recipes || recipes.length === 0) {
-      return { ok: false, reason: 'no_recipe_or_missing_items' };
-    }
-
-    const recipe = recipes[0];
     const yieldPerRun = recipe.result?.count || 1;
     const runs = args.runs || Math.ceil(count / yieldPerRun);
 
     token.throwIfCancelled();
     if (bot.craft) {
-      await bot.craft(recipe, runs, table || undefined);
+      try {
+        await bot.craft(recipe, runs, table || undefined);
+      } catch (err) {
+        if (runs === 1) throw err;
+        // Mixed ingredients (e.g. 1 birch + 1 spruce log): craft one run at a time with whatever fits.
+        for (let i = 0; i < runs; i++) {
+          token.throwIfCancelled();
+          const r = findRecipe(table);
+          if (!r) break;
+          await bot.craft(r, 1, table || undefined);
+        }
+      }
     }
     token.throwIfCancelled();
 

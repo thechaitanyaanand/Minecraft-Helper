@@ -6,6 +6,9 @@ const HOSTILE_MOBS = new Set([
   'zombie_villager', 'pillager', 'enderman',
 ]);
 
+// Mobs that shoot from range: worth answering with a bow instead of chasing.
+const RANGED_MOBS = new Set(['skeleton', 'stray', 'pillager']);
+
 const FOOD_MOBS = new Set([
   'cow', 'pig', 'chicken', 'sheep', 'rabbit', 'mooshroom',
 ]);
@@ -43,6 +46,25 @@ function countItem(bot, name) {
 function countItemsMatching(bot, regex) {
   if (!bot?.inventory?.items) return 0;
   return bot.inventory.items().reduce((acc, it) => (regex.test(it.name) ? acc + it.count : acc), 0);
+}
+
+// items() skips the off-hand slot (45), where an equipped shield lives.
+const hasShield = (bot) => bot?.inventory?.slots?.[45]?.name === 'shield' || countItem(bot, 'shield') > 0;
+const hasBow = (bot) => countItem(bot, 'bow') > 0 && countItem(bot, 'arrow') > 0;
+
+// Moves a shield into the off-hand if it's sitting in the inventory. Returns true when one is ready.
+async function equipShield(bot) {
+  if (bot?.inventory?.slots?.[45]?.name === 'shield') return true;
+  const shield = bot?.inventory?.items?.().find((it) => it.name === 'shield');
+  if (!shield || !bot.equip) return false;
+  try { await bot.equip(shield, 'off-hand'); return true; } catch (_) { return false; }
+}
+
+// Raise/lower the off-hand shield (a raised shield blocks melee, arrows and frontal explosions).
+function setShield(bot, up) {
+  if (!!bot._shieldUp === up) return;
+  bot._shieldUp = up;
+  try { up ? bot.activateItem?.(true) : bot.deactivateItem?.(); } catch (_) {}
 }
 
 function bestToolTier(bot, kind) {
@@ -112,6 +134,7 @@ function checkNames(mcData, extraNames = []) {
 
 module.exports = {
   HOSTILE_MOBS,
+  RANGED_MOBS,
   FOOD_MOBS,
   TOOL_TIERS,
   CHECKED_NAMES,
@@ -119,6 +142,10 @@ module.exports = {
   countItem,
   countItemsMatching,
   bestToolTier,
+  hasShield,
+  hasBow,
+  equipShield,
+  setShield,
   logBlockIds,
   hostilesNear,
   ownerEntity,

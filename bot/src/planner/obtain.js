@@ -1,14 +1,16 @@
 'use strict';
 const mcData = require('minecraft-data')('1.20.4');
 const { SMELTING } = require('./smelting');
+const { FOOD_MOBS } = require('../state/world');
 
 const UNSUPPORTED = new Set(['bread', 'wheat', 'blaze_rod', 'blaze_powder', 'ender_eye', 'ender_pearl', 'nether_star', 'elytra', 'shulker_box', 'totem_of_undying', 'saddle']);
 const MOB_DROPS = Object.freeze({
-  raw_beef: ['cow'], raw_porkchop: ['pig'], raw_chicken: ['chicken'], raw_mutton: ['sheep'],
-  white_wool: ['sheep'], feather: ['chicken'], string: ['spider'], spider_eye: ['spider'],
+  beef: ['cow', 'mooshroom'], porkchop: ['pig'], chicken: ['chicken'], mutton: ['sheep'], rabbit: ['rabbit'],
+  leather: ['cow', 'mooshroom'], white_wool: ['sheep'], feather: ['chicken'], string: ['spider'], spider_eye: ['spider'],
   bone: ['skeleton'], gunpowder: ['creeper'], rotten_flesh: ['zombie'],
 });
-const FOOD_ITEMS = new Set(['cooked_beef', 'cooked_porkchop', 'cooked_chicken', 'cooked_mutton', 'bread', 'apple', 'carrot', 'baked_potato', 'beef', 'porkchop', 'chicken', 'mutton']);
+const FOOD_ITEMS = new Set(['cooked_beef', 'cooked_porkchop', 'cooked_chicken', 'cooked_mutton', 'cooked_rabbit', 'bread', 'apple', 'carrot', 'baked_potato', 'beef', 'porkchop', 'chicken', 'mutton', 'rabbit']);
+const LOG_BLOCKS = mcData.blocksArray.map((b) => b.name).filter((n) => n.endsWith('_log') && !n.startsWith('stripped_'));
 const MANUFACTURED = new Set(['iron_block', 'gold_block', 'diamond_block', 'copper_block', 'emerald_block', 'lapis_block', 'redstone_block', 'netherite_block', 'raw_iron_block', 'raw_gold_block', 'raw_copper_block', 'coal_block']);
 
 const BLOCK_DROPS = {};
@@ -22,6 +24,12 @@ for (const b of mcData.blocksArray) {
       }
     }
   }
+}
+
+// What you get from breaking a block (stone -> cobblestone, iron_ore -> raw_iron).
+function dropOf(blockName) {
+  if (BLOCK_DROPS[blockName]?.includes(blockName)) return blockName;
+  return Object.keys(BLOCK_DROPS).find((d) => BLOCK_DROPS[d].includes(blockName)) || blockName;
 }
 
 function getCheapestHarvestTool(blockName) {
@@ -86,6 +94,12 @@ function plan(target, n = 1, inv = {}, depth = 0, seen = new Set()) {
   const needed = n - have, nextSeen = new Set(seen);
   nextSeen.add(normTarget);
 
+  // Any food will do: hunt whatever animal is around (raw meat counts, eating it is fine).
+  if (target === 'group:food') {
+    inv.beef = (inv.beef || 0) + needed;
+    return [{ skill: 'hunt', args: { mobNames: [...FOOD_MOBS], count: needed } }];
+  }
+
   // 1. CRAFT
   const itemInfo = mcData.itemsByName[normTarget] || mcData.blocksByName[normTarget];
   const rawRecipes = itemInfo ? mcData.recipes[itemInfo.id] : null;
@@ -146,7 +160,8 @@ function plan(target, n = 1, inv = {}, depth = 0, seen = new Set()) {
   }
 
   // 3. MINE
-  const sourceBlocks = BLOCK_DROPS[normTarget];
+  const isGenericLog = normTarget === 'oak_log';
+  const sourceBlocks = isGenericLog ? LOG_BLOCKS : BLOCK_DROPS[normTarget];
   if (sourceBlocks?.length > 0) {
     let mineSteps = [];
     const simInv = { ...inv };
@@ -158,7 +173,7 @@ function plan(target, n = 1, inv = {}, depth = 0, seen = new Set()) {
     }
     const countToMine = (normTarget === 'oak_log' || normTarget === 'group:logs') && depth > 0 && have === 0 ? Math.max(needed, 3) : needed;
     const toolType = harvestTool ? (harvestTool.includes('pickaxe') ? 'pickaxe' : (harvestTool.includes('axe') ? 'axe' : undefined)) : undefined;
-    mineSteps.push({ skill: 'collect_block', args: { blockNames: sourceBlocks, count: countToMine, needsTool: toolType } });
+    mineSteps.push({ skill: 'collect_block', args: { blockNames: sourceBlocks, count: countToMine, needsTool: toolType, dropName: isGenericLog ? 'logs' : normTarget } });
     simInv[normTarget] = (simInv[normTarget] || 0) + countToMine;
     Object.assign(inv, simInv);
     return mineSteps;
@@ -174,4 +189,4 @@ function plan(target, n = 1, inv = {}, depth = 0, seen = new Set()) {
   return { fail: 'no_source' };
 }
 
-module.exports = { plan, resolveGroup, getHave, BLOCK_DROPS, MOB_DROPS, FOOD_ITEMS };
+module.exports = { plan, resolveGroup, getHave, dropOf, parseRecipe, getCheapestHarvestTool, BLOCK_DROPS, MOB_DROPS, FOOD_ITEMS };

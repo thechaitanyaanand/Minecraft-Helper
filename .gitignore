@@ -8,3 +8,4 @@ server/*
 *.jar
 __pycache__/
 .venv/
+bot/memory.json

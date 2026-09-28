@@ -2,6 +2,13 @@
 const { Vec3 } = require('vec3');
 const { goals } = require('mineflayer-pathfinder');
 const { ownerEntity, bestToolTier } = require('../state/world');
+const { travel } = require('./travel');
+
+// Walks to the owner, following them if they move; keeps heading to their last seen spot if they go out of view.
+function travelToOwner(bot, ctx, token) {
+  let last = null;
+  return travel(bot, () => (last = ownerEntity(bot, ctx?.ownerName)?.position || last), token, 2);
+}
 
 const SCAFFOLD_NAMES = new Set(['dirt', 'grass_block', 'cobblestone', 'stone', 'cobbled_deepslate', 'oak_planks', 'sand', 'gravel']);
 
@@ -62,11 +69,9 @@ const comeToOwner = {
     if (!owner) return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby' };
 
     token.throwIfCancelled();
-    if (bot.pathfinder?.goto) {
-      await bot.pathfinder.goto(new goals.GoalNear(owner.position.x, owner.position.y, owner.position.z, 2));
-    }
+    const res = await travelToOwner(bot, ctx, token);
     token.throwIfCancelled();
-    return { ok: true, message: 'reached owner' };
+    return res.ok ? { ok: true, message: 'reached owner' } : res;
   },
 };
 
@@ -108,7 +113,7 @@ const followOwner = {
 const giveToOwner = {
   name: 'give_to_owner',
   describe: 'walk to owner and toss inventory items',
-  timeoutMs: 30_000,
+  timeoutMs: 90_000, // walking back from a far gathering spot plus tossing
   isAvailable(bot, ctx) {
     if (!ownerEntity(bot, ctx?.ownerName)) return { ok: false, reason: 'owner_not_found' };
     const items = bot.inventory?.items ? bot.inventory.items() : [];
@@ -120,7 +125,8 @@ const giveToOwner = {
     if (!owner) return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby' };
 
     token.throwIfCancelled();
-    if (bot.pathfinder?.goto) await bot.pathfinder.goto(new goals.GoalNear(owner.position.x, owner.position.y, owner.position.z, 2));
+    const trip = await travelToOwner(bot, ctx, token);
+    if (!trip.ok) return trip; // never toss items somewhere the owner isn't
     token.throwIfCancelled();
 
     if (bot.lookAt && owner.position) {
@@ -131,8 +137,8 @@ const giveToOwner = {
     const items = bot.inventory?.items ? [...bot.inventory.items()] : [];
     let tossedCount = 0;
 
-    if (args.item) {
-      const targetItems = items.filter((it) => it.name === args.item);
+    if (args.item || args.match) {
+      const targetItems = items.filter((it) => (args.match ? args.match(it.name) : it.name === args.item));
       let countNeeded = args.count || 999;
       for (const it of targetItems) {
         if (countNeeded <= 0) break;
@@ -151,6 +157,7 @@ const giveToOwner = {
 };
 
 module.exports = {
+  travelToOwner,
   comeToOwner,
   followOwner,
   giveToOwner,

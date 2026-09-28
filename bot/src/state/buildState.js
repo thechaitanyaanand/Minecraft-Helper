@@ -6,6 +6,8 @@ const {
   logBlockIds,
   hostilesNear,
   ownerEntity,
+  hasShield,
+  hasBow,
   FOOD_MOBS,
 } = require('./world');
 
@@ -120,7 +122,7 @@ function buildState(bot, ctx = {}, opts = {}) {
   // Enforce literal, fixed key order
   const state = {};
   state.purpose = purpose;
-  if (purpose === 'intent') {
+  if (purpose === 'intent' || purpose === 'talk') {
     state.player_message = sanitizeMessage(opts.playerMessage);
   }
 
@@ -135,6 +137,8 @@ function buildState(bot, ctx = {}, opts = {}) {
     pickaxe: bestToolTier(bot, 'pickaxe'),
     axe: bestToolTier(bot, 'axe'),
     sword: bestToolTier(bot, 'sword'),
+    shield: hasShield(bot),
+    bow: hasBow(bot),
   };
 
   state.nearby = getNearby(bot, ownerName, mcData);

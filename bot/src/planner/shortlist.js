@@ -20,7 +20,13 @@ const ALIASES = Object.freeze({
   table: 'crafting_table',
   furnace: 'furnace',
   door: 'oak_door',
+  iron: 'iron_ingot',
+  gold: 'gold_ingot',
+  copper: 'copper_ingot',
 });
+
+// Exact names that almost always mean something else in chat ("get stone" = cobblestone, not smelted stone).
+const PREFER = Object.freeze({ stone: 'cobblestone' });
 
 function getTrigrams(str) {
   const clean = ' ' + str.toLowerCase().replace(/[^a-z0-9]/g, ' ').trim() + ' ';
@@ -68,36 +74,25 @@ function parseDirectTarget(text, mcData) {
   }
 
 
-  // Mob check for kill/attack
-  const mobs = ['spider', 'zombie', 'skeleton', 'creeper', 'cow', 'pig', 'sheep', 'chicken', 'drowned', 'enderman'];
-  for (const m of mobs) {
-    if (new RegExp(`\\b${m}s?\\b`, 'i').test(clean)) {
-      return `mob:${m}`;
-    }
-  }
-
-  for (const [alias, mapped] of Object.entries(ALIASES)) {
-    if (new RegExp(`\\b${alias}\\b`, 'i').test(clean)) {
-      return mapped;
-    }
-  }
-
-  // Exact item / block check
+  // Exact item/block names first (longest phrase at each position) so "iron sword" beats the "sword" alias
   const words = clean.split(/\s+/);
   for (let i = 0; i < words.length; i++) {
     for (let len = 3; len >= 1; len--) {
-      if (i + len <= words.length) {
-        const candidate = words.slice(i, i + len).join('_');
-        if (mcData?.itemsByName[candidate] || mcData?.blocksByName[candidate]) {
-          return candidate;
-        }
-        const singular = candidate.replace(/es$/, '').replace(/s$/, '');
-        if (singular && (mcData?.itemsByName[singular] || mcData?.blocksByName[singular])) {
-          return singular;
-        }
+      if (i + len > words.length) continue;
+      const c = words.slice(i, i + len).join('_');
+      for (const cand of [c, c.replace(/s$/, ''), c.replace(/es$/, '')]) {
+        if (cand && (mcData?.itemsByName[cand] || mcData?.blocksByName[cand])) return PREFER[cand] || cand;
       }
     }
   }
+
+  // Mob check for kill/attack
+  const mobs = ['spider', 'zombie', 'skeleton', 'creeper', 'cow', 'pig', 'sheep', 'chicken', 'drowned', 'enderman'];
+  const mob = mobs.find((m) => words.includes(m) || words.includes(`${m}s`));
+  if (mob) return `mob:${mob}`;
+
+  const alias = Object.keys(ALIASES).find((a) => words.includes(a));
+  if (alias) return ALIASES[alias];
   return null;
 }
 

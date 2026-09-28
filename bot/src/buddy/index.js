@@ -2,7 +2,15 @@
 const log = require('../log');
 const questions = require('../decision/questions');
 const { buildState } = require('../state/buildState');
-const { ownerEntity, HOSTILE_MOBS, timeOfDayLabel } = require('../state/world');
+const { ownerEntity, HOSTILE_MOBS, timeOfDayLabel, hasShield } = require('../state/world');
+const { dropOf } = require('../planner/obtain');
+const { FOOD_PRIORITY } = require('../skills/eat');
+
+// Things the owner visibly needs, handed over unasked. `when` sees the owner state and our inventory.
+const GIFTS = Object.freeze([
+  { item: 'arrow', count: 16, keep: 16, when: (o) => /bow$/.test(o?.held || ''), say: 'Here, have some arrows for that bow!' },
+  { item: 'torch', count: 8, keep: 8, when: (o, night) => night || /_pickaxe$/.test(o?.held || ''), say: 'Take some torches to light things up!' },
+]);
 
 function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
   let enabled = false, runningAction = null, actionStartTime = 0, lastChatter = 0, loopTimer = null, inFlight = false;
@@ -17,6 +25,30 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
 
   function suppress(action, durationMs = 300_000) {
     suppressedOffers.set(action, Date.now() + durationMs);
+  }
+  const suppressed = (action) => (suppressedOffers.get(action) || 0) > Date.now();
+
+  // Hands over just these items (give_items would dump the whole inventory, tools included).
+  function handOver(match, count, msg) {
+    if (canChat(true)) say(msg);
+    return planner?.runSkillByName?.('give_to_owner', { match, count });
+  }
+
+  function giftFor(ownerState, inv, night) {
+    return GIFTS.find((g) => !suppressed(`gift_${g.item}`) && (inv[g.item] || 0) >= g.count + g.keep && g.when(ownerState, night));
+  }
+
+  // The mob that hit the owner if we saw it, else the hostile closest to them. Creepers only with a shield up.
+  function pickTarget(owner) {
+    const attacker = observer.getLastAttacker?.();
+    if (attacker && (attacker.name !== 'creeper' || hasShield(bot))) return attacker;
+    let best = null, bestD = 16;
+    for (const e of Object.values(bot.entities || {})) {
+      if (!e?.position || !HOSTILE_MOBS.has(e.name) || (e.name === 'creeper' && !hasShield(bot))) continue;
+      const d = owner.position?.distanceTo?.(e.position) ?? 999;
+      if (d <= bestD) { best = e; bestD = d; }
+    }
+    return best;
   }
 
   function getLegalActions(ownerState, helperHealth, inv, timeOfDay, currentGoal) {
@@ -65,12 +97,12 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
       const pos = bot.entity?.position;
       if (pos && owner.position && pos.distanceTo(owner.position) > 6) planner?.startGoal?.('come_here');
     } else if (action === 'protect_owner') {
-      const nearest = ownerState?.hostiles_near_owner?.[0];
-      if (canChat(true)) say(`Watch out ${config.ownerName}! Defending you against ${nearest?.type || 'monster'}!`);
-      const targetEntity = Object.values(bot.entities || {}).find(e => HOSTILE_MOBS.has(e.name) && (owner.position?.distanceTo?.(e.position) <= 16 || bot.entity?.position?.distanceTo?.(e.position) <= 16));
-      if (targetEntity && planner?.runSkillByName) planner.runSkillByName('fight', { targetEntity });
+      const targetEntity = pickTarget(owner);
+      if (!targetEntity) return;
+      if (canChat(true)) say(`Watch out ${config.ownerName}! Defending you against ${targetEntity.name.replace(/_/g, ' ')}!`);
+      if (planner?.runSkillByName) planner.runSkillByName('fight', { targetEntity });
     } else if (action === 'gather_same') {
-      const broke = Object.keys(ownerState?.recent?.broke || {})[0] || 'oak_log';
+      const broke = dropOf(Object.keys(ownerState?.recent?.broke || {})[0] || 'oak_log'); // stone -> cobblestone, iron_ore -> raw_iron
       if (needsHelp < 0.5) {
         if (canChat()) { setPending('buddy_offer', { action: 'gather_same', item: broke }); say(`You're gathering ${broke} — want me to get some nearby? (yes/no)`); }
       } else {
@@ -82,12 +114,10 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
       if (needsHelp < 0.5) {
         if (canChat()) { setPending('buddy_offer', { action: 'bring_materials', item: placed }); say(`You're building with ${placed} — want more? (yes/no)`); }
       } else {
-        if (canChat()) say(`Bringing you more ${placed}!`);
-        planner?.startGoal?.('give_items');
+        await handOver((n) => n === placed, 64, `Bringing you more ${placed}!`);
       }
     } else if (action === 'give_food') {
-      if (canChat()) say('Here is some food for you!');
-      planner?.startGoal?.('give_items');
+      await handOver((n) => FOOD_PRIORITY.includes(n), 8, 'Here is some food for you!');
     } else if (action === 'build_shelter_near_owner') {
       if (canChat()) { setPending('buddy_offer', { action: 'build_shelter_near_owner' }); say('Night is approaching! Want me to dig us a shelter? (yes/no)'); }
     } else if (action === 'scout_ahead') {
@@ -103,7 +133,9 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     if (plState.mode !== 'idle' && plState.mode !== 'buddy' && !dangerTrigger) return;
 
     const ownerState = observer.getOwnerState(), helperHealth = Math.round(bot.health || 20);
-    if (ownerState?.hostiles_near_owner?.length > 0 && ownerState?.health <= 8) {
+    // Owner just got hit by something we can see: go after it right away, no model call.
+    const hitBySomething = dangerTrigger && helperHealth > 10 && observer.getLastAttacker?.();
+    if (hitBySomething || (ownerState?.hostiles_near_owner?.length > 0 && ownerState?.health <= 8)) {
       runningAction = 'protect_owner'; actionStartTime = Date.now();
       return executeAction('protect_owner', ownerState, 1.0);
     }
@@ -114,6 +146,12 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     const inv = {};
     if (bot.inventory?.items) for (const it of bot.inventory.items()) if (it?.name) inv[it.name] = (inv[it.name] || 0) + it.count;
     const timeOfDay = timeOfDayLabel(bot.time?.timeOfDay ?? 6000);
+    const gift = giftFor(ownerState, inv, timeOfDay === 'dusk' || timeOfDay === 'night');
+    if (gift) {
+      suppress(`gift_${gift.item}`, 5 * 60_000);
+      runningAction = 'gift'; actionStartTime = now;
+      return handOver((n) => n === gift.item, gift.count, gift.say);
+    }
     const legal = getLegalActions(ownerState, helperHealth, inv, timeOfDay, plState.currentGoal);
 
     if (legal.length === 1 && legal[0] === 'stay_close') {
@@ -145,15 +183,52 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     }
   }
 
+  // Jump into the owner's fight right away, in any planner mode (following, gathering...): the planner pauses the
+  // current step and resumes it afterwards. No model call: someone hitting the owner is not a judgement call.
+  let lastDefendSay = 0;
+  function defend(target) {
+    if (!enabled || !target?.isValid || !target.position) return false;
+    if (Math.round(bot.health ?? 20) <= 10) return false;
+    if (target.name === 'creeper' && !hasShield(bot)) return false;
+    if ((bot.entity?.position?.distanceTo?.(target.position) ?? 999) > 24) return false;
+    const started = planner?.defendOwner?.(target);
+    if (started && Date.now() - lastDefendSay > 30_000) {
+      lastDefendSay = Date.now();
+      say(`I've got your back! Fighting the ${target.name.replace(/_/g, ' ')}.`);
+    }
+    return Boolean(started);
+  }
+
+  // Registered after the observer's own entityHurt listener, so getLastAttacker() already reflects this hit.
+  function onEntityHurt(entity) {
+    if (entity?.username !== config.ownerName) return;
+    if (!defend(observer.getLastAttacker?.())) tick(true);
+  }
+
+  // The owner swinging with a hostile mob right next to them means they're fighting it, even before taking a hit.
+  function onSwingArm(entity) {
+    if (entity?.username !== config.ownerName || !entity.position) return;
+    let mob = null, best = 4;
+    for (const e of Object.values(bot.entities || {})) {
+      if (!e?.position || !HOSTILE_MOBS.has(e.name)) continue;
+      const d = entity.position.distanceTo(e.position);
+      if (d <= best) { mob = e; best = d; }
+    }
+    if (mob) defend(mob);
+  }
+
   function start() {
-    if (loopTimer) clearInterval(loopTimer);
+    stop();
     loopTimer = setInterval(() => tick(false), 8000);
-    bot?.on?.('entityHurt', (entity) => { if (entity?.username === config.ownerName) tick(true); });
+    bot?.on?.('entityHurt', onEntityHurt);
+    bot?.on?.('entitySwingArm', onSwingArm);
   }
 
   function stop() {
     if (loopTimer) clearInterval(loopTimer);
     loopTimer = null; runningAction = null;
+    bot?.removeListener?.('entityHurt', onEntityHurt);
+    bot?.removeListener?.('entitySwingArm', onSwingArm);
   }
 
   return {
@@ -161,7 +236,7 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     disable: () => { enabled = false; stop(); },
     toggle: () => { enabled = !enabled; if (enabled) start(); else stop(); return enabled; },
     isEnabled: () => enabled,
-    tick, suppress, getLegalActions, heuristicPick, cleanup: stop, executeAction,
+    tick, suppress, getLegalActions, heuristicPick, cleanup: stop, executeAction, giftFor, defend,
   };
 }
 

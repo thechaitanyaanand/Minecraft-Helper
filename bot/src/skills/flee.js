@@ -1,7 +1,7 @@
 'use strict';
 const { Vec3 } = require('vec3');
 const { goals } = require('mineflayer-pathfinder');
-const { HOSTILE_MOBS, hostilesNear } = require('../state/world');
+const { HOSTILE_MOBS, hostilesNear, equipShield, setShield } = require('../state/world');
 
 function findNearestHostile(bot, radius = 12) {
   if (!bot.nearestEntity || !bot.entity?.position) return null;
@@ -42,6 +42,7 @@ module.exports = {
     };
 
     setFleeGoal();
+    const hasShield = await equipShield(bot);
 
     let lastAim = Date.now();
     while (!token.cancelled) {
@@ -59,6 +60,13 @@ module.exports = {
         break; // Successfully escaped
       }
 
+      // Creeper too close to outrun: face it behind the shield (blocks the blast from the front).
+      const brace = hasShield && hostile.name === 'creeper' && dist <= 4;
+      if (brace && bot.lookAt) {
+        try { await bot.lookAt(hostile.position.offset(0, 1, 0), true); } catch (_) {}
+      }
+      setShield(bot, brace);
+
       if (Date.now() - lastAim >= 2000) {
         lastAim = Date.now();
         setFleeGoal();
@@ -67,6 +75,7 @@ module.exports = {
       await new Promise((r) => setTimeout(r, 200));
     }
 
+    setShield(bot, false);
     if (bot.pathfinder?.stop) {
       bot.pathfinder.stop();
       bot.pathfinder.setGoal(null);

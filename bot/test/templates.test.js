@@ -3,31 +3,6 @@ const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const templates = require('../src/chat/templates');
 
-test('templates.explain matches topics from conversational text', () => {
-  const craft1 = templates.explain('how do i make a crafting table');
-  const craft2 = templates.explain('what is a workbench');
-  assert.ok(craft1.includes('crafting table'));
-  assert.equal(craft1, craft2);
-
-  const pick1 = templates.explain('why do i need a pickaxe');
-  const pick2 = templates.explain('how to mine stone');
-  assert.ok(pick1.includes('pickaxe'));
-  assert.equal(pick1, pick2);
-
-  const night1 = templates.explain('its getting dark what do i do');
-  const night2 = templates.explain('raat ho gayi kaise bache');
-  assert.ok(night1.includes('night') || night1.includes('monsters'));
-  assert.equal(night1, night2);
-
-  const food1 = templates.explain('im hungry where to find food');
-  const food2 = templates.explain('khana chahiye kaise milega');
-  assert.ok(food1.includes('hunger') || food1.includes('food'));
-  assert.equal(food1, food2);
-
-  const unknown = templates.explain('something completely random');
-  assert.ok(unknown.includes('Ask me about'));
-});
-
 test('templates.announceGoal and stepStart support learn mode', () => {
   const goalNorm = templates.announceGoal('get_wood', false);
   const goalLearn = templates.announceGoal('get_wood', true);
@@ -69,10 +44,6 @@ test('all template outputs are within 240 chars limit', () => {
     templates.stepStart('eat', {}, true),
     templates.stepStart('dig_in', {}, true),
     templates.stepFailed('collect_block', 'no_target'),
-    templates.explain('how do i make a crafting table'),
-    templates.explain('pickaxe'),
-    templates.explain('night'),
-    templates.explain('food'),
   ];
 
   for (const s of samples) {

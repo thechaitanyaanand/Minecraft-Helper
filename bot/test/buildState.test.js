@@ -120,6 +120,8 @@ test('buildState: correctly computes tools and nearby objects', () => {
     pickaxe: 'iron',
     axe: 'none',
     sword: 'diamond',
+    shield: false,
+    bow: false,
   });
 
   assert.equal(s.nearby.trees_within_32, 2);

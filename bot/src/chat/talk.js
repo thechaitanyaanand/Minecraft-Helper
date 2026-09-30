@@ -15,7 +15,7 @@ const { ownerEntity, timeOfDayLabel } = require('../state/world');
 // so it stays one ~100 ms pass, and memories reach the model only when they match what the player said.
 const MAX_OPTIONS = 12;
 const DEATH_WORDS = /\b(died|slain|killed|shot|blew up|drowned|burned|fell|starved)\b/i;
-const STOP = new Set('the a an and or but to of in on at is are was were be it this that i me my you your we our do did does can could would should will what where when why how who which with for from have has had just please helper there here its im'.split(' '));
+const STOP = new Set('the a an and or but to of in on at is are was were be it this that i me my you your we our do did does can could would should will what where when why how who which with for from have has had just please butler there here its im'.split(' '));
 
 const norm = (s) => ` ${String(s).toLowerCase().replace(/[^a-z0-9\s]/g, ' ').replace(/\s+/g, ' ').trim()} `;
 const pretty = (n) => String(n).replace(/_/g, ' ');
@@ -79,6 +79,9 @@ function createTalk({ bot, decider, say, setPending, planner, config, makeCtx = 
       make_tools: 'We need better tools. Want me to make stone ones?',
       get_wood: 'Let\'s stock up on wood. Want me to chop some?',
       progress: 'Let\'s upgrade our gear! Want me to start on the next piece?',
+      deep_mine: 'Ready for diamonds? Deep mining expedition at Y=-58?',
+      enter_nether: 'Want to build a Nether portal and venture to the Nether?',
+      defeat_ender_dragon: 'Ready to enter the End and slay the Ender Dragon?',
     };
     if (goal === 'progress' && Math.random() < 0.4) return { text: 'Want to build a hut together? (yes/no)', offer: 'blueprint:hut_5x5' };
     return { text: `${lines[goal] || lines.progress} (yes/no)`, offer: goal };
@@ -92,16 +95,18 @@ function createTalk({ bot, decider, say, setPending, planner, config, makeCtx = 
     const pl = planner?.getState?.() || { mode: 'idle' };
     const p = bot?.entity?.position, o = ownerEntity(bot, config.ownerName)?.position;
     return [
-      { id: 'fact_inventory', about: 'what items the helper is carrying', keys: ['inventory', 'carrying', 'what do you have', 'your items', 'tumhare paas'],
+      { id: 'fact_inventory', about: 'what items the butler is carrying', keys: ['inventory', 'carrying', 'what do you have', 'your items', 'tumhare paas'],
         reply: () => (inv.length ? `I'm carrying: ${inv.slice(0, 12).join(', ')}.` : 'My pockets are empty!') },
       { id: 'fact_time', about: 'what time it is and how long until night or morning', keys: ['time', 'what time', 'when is night', 'how long', 'baje'],
         reply: () => (label === 'day' ? `It's day. Night starts in about ${mins(12000 - t)} minutes.` : `It's ${label}. Morning comes in about ${mins((24000 - t) % 24000)} minutes.`) },
-      { id: 'fact_where', about: 'where the helper is', keys: ['where are you', 'kahan ho', 'your location', 'your coords'],
+      { id: 'fact_where', about: 'where the butler is', keys: ['where are you', 'kahan ho', 'your location', 'your coords'],
         reply: () => (p ? `I'm at ${fmt(p.floored())}${o ? `, ${Math.round(p.distanceTo(o))} blocks from you` : ''}.` : 'Not sure, I just spawned!') },
-      { id: 'fact_doing', about: 'what the helper is doing right now', keys: ['what are you doing', 'doing', 'busy', 'kya kar rahe'],
+      { id: 'fact_doing', about: 'what the butler is doing right now', keys: ['what are you doing', 'doing', 'busy', 'kya kar rahe'],
         reply: () => (pl.mode === 'idle' ? 'Just hanging out with you. Got a job for me?' : `Working on ${templates.goalLabel(pl.currentGoal)}.`) },
       { id: 'fact_places', about: 'remembered places: home, chests and where the player died', keys: ['where is home', 'where is my', 'my chests', 'where did i die', 'my base'],
         reply: () => memory.describe() },
+      d.stronghold && { id: 'fact_stronghold', about: 'where the stronghold is', keys: ['stronghold', 'end portal', 'where is the stronghold', 'portal room'],
+        reply: () => ({ text: `The stronghold is at ${fmt(d.stronghold)}. Want to head there? (yes/no)`, offer: 'find_stronghold' }) },
       ...d.notes.map((n, i) => ({
         id: `note_${i}`, about: `the player told me: ${n.text}`, keys: words(n.text),
         reply: () => ({ text: `You told me: "${n.text}"${n.pos ? ` (at ${fmt(n.pos)}). Want me to take you there? (yes/no)` : '.'}`, offer: n.pos ? `goto:${fmt(n.pos).replace(/ /g, ',')}` : null }),
@@ -111,11 +116,11 @@ function createTalk({ bot, decider, say, setPending, planner, config, makeCtx = 
         keys: [...words(e.text), 'last time', 'happened', ...(DEATH_WORDS.test(e.text) ? ['die', 'died', 'death', 'killed'] : [])],
         reply: () => `${ago(e.t)}: ${e.text}.`,
       })),
-    ];
+    ].filter(Boolean);
   }
 
   function candidates(text) {
-    const ctx = { health: health(), food: Math.round(bot?.food ?? 20), botName: bot?.username || 'Helper', suggest };
+    const ctx = { health: health(), food: Math.round(bot?.food ?? 20), botName: bot?.username || 'Butler', suggest };
     const pool = [
       ...KNOWLEDGE.map((k) => ({ id: k.id, about: k.about, keys: k.keys, reply: () => k.text })),
       ...SMALLTALK.map((s) => ({ id: `st_${s.id}`, about: s.about, keys: s.keys, reply: () => (typeof s.say === 'function' ? s.say(ctx) : pick(s.say)) })),
@@ -188,7 +193,7 @@ function createTalk({ bot, decider, say, setPending, planner, config, makeCtx = 
       ].filter(Boolean).map((p) => ({ ...p, score: score(text, p.keys) }))
         .filter((p) => p.score >= 0.5).sort((a, b) => b.score - a.score).slice(0, MAX_OPTIONS);
       const chosen = await choose(text, places, 'The player wants to go somewhere. Which remembered place do they mean?');
-      if (!chosen) return say('I don\'t know that place yet. Stand there and say "helper remember this is my <name>".');
+      if (!chosen) return say('I don\'t know that place yet. Stand there and say "butler remember this is my <name>".');
       // "my iron farm is here" -> "your iron farm"
       const label = chosen.about.replace(/\b(is here|this is|this place is|here|yahan hai|yaha)\b/gi, '').replace(/\bmy\b/gi, 'your').replace(/\s+/g, ' ').trim();
       say(`Heading to ${label}!`);

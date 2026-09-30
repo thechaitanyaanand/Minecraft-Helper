@@ -45,8 +45,15 @@ function hasEdibleFood(bot) {
 
 function isNearOwner(bot, ctx, maxDist = 3) {
   const owner = ownerEntity(bot, ctx?.ownerName);
-  if (!owner?.position || !bot?.entity?.position) return false;
-  return bot.entity.position.distanceTo(owner.position) <= maxDist;
+  const p = bot?.entity?.position;
+  if (!owner?.position || !p) return false;
+  if (typeof p.distanceTo === 'function') {
+    return p.distanceTo(owner.position) <= maxDist;
+  }
+  const dx = owner.position.x - p.x;
+  const dz = owner.position.z - p.z;
+  const dy = Math.abs(owner.position.y - p.y);
+  return Math.hypot(dx, dz) <= maxDist && dy <= 3;
 }
 
 function hasAnyItems(bot) {
@@ -71,7 +78,9 @@ function isEnclosed(bot) {
 // Autopilot gear progression, in order. Owning a better tier of the same thing counts.
 const UPGRADES = Object.freeze([
   'stone_sword', 'stone_axe', 'iron_pickaxe', 'iron_sword', 'shield',
-  'iron_chestplate', 'iron_helmet', 'iron_leggings', 'iron_boots', 'diamond_pickaxe', 'diamond_sword',
+  'iron_chestplate', 'iron_helmet', 'iron_leggings', 'iron_boots',
+  'diamond_pickaxe', 'diamond_sword', 'diamond_chestplate', 'diamond_helmet',
+  'diamond_leggings', 'diamond_boots', 'bow',
 ]);
 
 function owns(bot, name) {
@@ -100,16 +109,16 @@ const GOALS = {
 
   make_tools: {
     describe: 'craft a pickaxe, then stone tools',
-    done: (b) => hasItem(b, 'stone_pickaxe'),
+    done: (b) => owns(b, 'stone_pickaxe'),
     steps: [
-      { skill: 'collect_logs', args: { count: 3 }, need: (b) => !hasItem(b, 'stone_pickaxe') && planksPotential(b) < 12 && countLogs(b) < 3 },
-      { skill: 'craft_planks', need: (b) => !hasItem(b, 'stone_pickaxe') && countPlanks(b) < 8 && countLogs(b) > 0 },
-      { skill: 'craft_sticks', need: (b) => !hasItem(b, 'stone_pickaxe') && countItem(b, 'stick') < (bestToolTier(b, 'pickaxe') === 'none' ? 4 : 2) },
-      { skill: 'place_crafting_table', need: (b) => !hasItem(b, 'stone_pickaxe') && !tableNearby(b) },
+      { skill: 'collect_logs', args: { count: 3 }, need: (b) => !owns(b, 'stone_pickaxe') && planksPotential(b) < 12 && countLogs(b) < 3 },
+      { skill: 'craft_planks', need: (b) => !owns(b, 'stone_pickaxe') && countPlanks(b) < 8 && countLogs(b) > 0 },
+      { skill: 'craft_sticks', need: (b) => !owns(b, 'stone_pickaxe') && countItem(b, 'stick') < (bestToolTier(b, 'pickaxe') === 'none' ? 4 : 2) },
+      { skill: 'place_crafting_table', need: (b) => !owns(b, 'stone_pickaxe') && !tableNearby(b) },
       { skill: 'craft_tool', args: { item: 'wooden_pickaxe' }, need: (b) => bestToolTier(b, 'pickaxe') === 'none' },
-      { skill: 'mine_stone', args: { count: 6 }, need: (b) => !hasItem(b, 'stone_pickaxe') && countItem(b, 'cobblestone') < 6 },
-      { skill: 'place_crafting_table', need: (b) => !hasItem(b, 'stone_pickaxe') && !tableNearby(b) },
-      { skill: 'craft_tool', args: { item: 'stone_pickaxe' }, need: (b) => !hasItem(b, 'stone_pickaxe') },
+      { skill: 'mine_stone', args: { count: 6 }, need: (b) => !owns(b, 'stone_pickaxe') && countItem(b, 'cobblestone') < 6 },
+      { skill: 'place_crafting_table', need: (b) => !owns(b, 'stone_pickaxe') && !tableNearby(b) },
+      { skill: 'craft_tool', args: { item: 'stone_pickaxe' }, need: (b) => !owns(b, 'stone_pickaxe') },
     ],
   },
 
@@ -182,6 +191,114 @@ const GOALS = {
     done: (b) => !hasAnyItems(b),
     steps: [
       { skill: 'give_to_owner', need: (b) => hasAnyItems(b) },
+    ],
+  },
+
+  deep_mine: {
+    describe: 'descend to Y=-58 and mine diamonds',
+    done: (b) => countItem(b, 'diamond') >= 3 || owns(b, 'diamond_pickaxe'),
+    steps: [
+      { skill: 'deep_mine', args: { count: 3 }, need: (b) => countItem(b, 'diamond') < 3 && !owns(b, 'diamond_pickaxe') },
+    ],
+  },
+
+  enter_nether: {
+    describe: 'gather obsidian, construct and ignite a Nether portal, and enter',
+    done: (b) => b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether',
+    steps: [
+      { skill: 'collect_block', args: { blockNames: ['obsidian'], count: 10, needsTool: 'pickaxe', dropName: 'obsidian' }, need: (b) => countItem(b, 'obsidian') < 10 },
+      { skill: 'craft', args: { item: 'flint_and_steel', count: 1 }, need: (b) => countItem(b, 'flint_and_steel') < 1 && countItem(b, 'obsidian') >= 10 },
+      { skill: 'build_portal', need: (b) => countItem(b, 'obsidian') >= 10 && countItem(b, 'flint_and_steel') >= 1 },
+      { skill: 'enter_portal', need: () => true },
+    ],
+  },
+
+  get_blaze_rods: {
+    describe: 'find a Nether fortress, defeat blazes, and collect blaze rods',
+    done: (b) => countItem(b, 'blaze_rod') >= 6,
+    steps: [
+      { skill: 'collect_block', args: { blockNames: ['obsidian'], count: 10, needsTool: 'pickaxe', dropName: 'obsidian' }, need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'obsidian') < 10 },
+      { skill: 'craft', args: { item: 'flint_and_steel', count: 1 }, need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'flint_and_steel') < 1 && countItem(b, 'obsidian') >= 10 },
+      { skill: 'build_portal', need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'obsidian') >= 10 && countItem(b, 'flint_and_steel') >= 1 },
+      { skill: 'enter_portal', need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') },
+      { skill: 'find_fortress', need: (b) => countItem(b, 'blaze_rod') < 6 && !memory.get().fortress },
+      { skill: 'hunt_blaze', args: { count: 6 }, need: (b) => countItem(b, 'blaze_rod') < 6 },
+    ],
+  },
+
+  gather_ender_pearls: {
+    describe: 'barter with piglins or hunt endermen for ender pearls',
+    done: (b) => countItem(b, 'ender_pearl') >= 12,
+    steps: [
+      { skill: 'barter_piglin', args: { count: 12 }, need: (b) => countItem(b, 'ender_pearl') < 12 && countItem(b, 'gold_ingot') > 0 },
+      { skill: 'hunt_enderman', args: { count: 12 }, need: (b) => countItem(b, 'ender_pearl') < 12 },
+    ],
+  },
+
+  craft_eyes_of_ender: {
+    describe: 'craft blaze powder and eyes of ender',
+    done: (b) => countItem(b, 'ender_eye') >= 12,
+    steps: [
+      { skill: 'craft', args: { item: 'blaze_powder', runs: 6 }, need: (b) => countItem(b, 'blaze_powder') < 12 && countItem(b, 'blaze_rod') > 0 },
+      { skill: 'craft', args: { item: 'ender_eye', runs: 12 }, need: (b) => countItem(b, 'ender_eye') < 12 && countItem(b, 'ender_pearl') > 0 },
+    ],
+  },
+
+  find_stronghold: {
+    describe: 'triangulate stronghold coordinates and dig down safely into the stronghold',
+    done: () => Boolean(memory.get().reachedStronghold),
+    steps: [
+      { skill: 'triangulate_stronghold', need: () => !memory.get().stronghold },
+      { skill: 'find_stronghold', need: () => !memory.get().reachedStronghold },
+    ],
+  },
+
+  activate_end_portal: {
+    describe: 'find the portal room, clear silverfish, and fill frames with eyes of ender',
+    done: () => Boolean(memory.get().endPortalActivated),
+    steps: [
+      { skill: 'activate_end_portal', need: () => !memory.get().endPortalActivated },
+    ],
+  },
+
+  defeat_ender_dragon: {
+    describe: 'enter the End, destroy End crystals, dodge dragon breath, and defeat the Ender Dragon',
+    done: () => Boolean(memory.get().dragonDefeated),
+    steps: [
+      { skill: 'fight_dragon', need: () => !memory.get().dragonDefeated },
+    ],
+  },
+
+  beat_game: {
+    describe: 'complete full progression chain up to defeating the Ender Dragon',
+    done: () => Boolean(memory.get().dragonDefeated),
+    steps: [
+      { skill: 'collect_logs', args: { count: 8 }, need: (b) => countLogs(b) < 8 && !owns(b, 'stone_pickaxe') },
+      { skill: 'craft_planks', need: (b) => !owns(b, 'stone_pickaxe') && countPlanks(b) < 8 && countLogs(b) > 0 },
+      { skill: 'craft_sticks', need: (b) => !owns(b, 'stone_pickaxe') && countItem(b, 'stick') < 4 },
+      { skill: 'place_crafting_table', need: (b) => !owns(b, 'stone_pickaxe') && !tableNearby(b) },
+      { skill: 'craft_tool', args: { item: 'wooden_pickaxe' }, need: (b) => bestToolTier(b, 'pickaxe') === 'none' },
+      { skill: 'mine_stone', args: { count: 6 }, need: (b) => !owns(b, 'stone_pickaxe') && countItem(b, 'cobblestone') < 6 },
+      { skill: 'craft_tool', args: { item: 'stone_pickaxe' }, need: (b) => !owns(b, 'stone_pickaxe') },
+      { skill: 'collect_block', args: { blockNames: ['iron_ore', 'deepslate_iron_ore'], count: 3, dropName: 'raw_iron', needsTool: 'pickaxe' }, need: (b) => !owns(b, 'iron_pickaxe') && countItem(b, 'raw_iron') + countItem(b, 'iron_ingot') < 3 },
+      { skill: 'smelt', args: { item: 'iron_ingot', count: 3 }, need: (b) => !owns(b, 'iron_pickaxe') && countItem(b, 'iron_ingot') < 3 && countItem(b, 'raw_iron') >= 3 },
+      { skill: 'craft_tool', args: { item: 'iron_pickaxe' }, need: (b) => !owns(b, 'iron_pickaxe') },
+      { skill: 'deep_mine', args: { count: 3 }, need: (b) => countItem(b, 'diamond') < 3 && !owns(b, 'diamond_pickaxe') },
+      { skill: 'craft_tool', args: { item: 'diamond_pickaxe' }, need: (b) => !owns(b, 'diamond_pickaxe') },
+      { skill: 'collect_block', args: { blockNames: ['obsidian'], count: 10, needsTool: 'pickaxe', dropName: 'obsidian' }, need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'obsidian') < 10 && countItem(b, 'blaze_rod') < 6 },
+      { skill: 'craft', args: { item: 'flint_and_steel', count: 1 }, need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'flint_and_steel') < 1 && countItem(b, 'obsidian') >= 10 && countItem(b, 'blaze_rod') < 6 },
+      { skill: 'build_portal', need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'obsidian') >= 10 && countItem(b, 'flint_and_steel') >= 1 && countItem(b, 'blaze_rod') < 6 },
+      { skill: 'enter_portal', need: (b) => !(b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'blaze_rod') < 6 },
+      { skill: 'find_fortress', need: (b) => (b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'blaze_rod') < 6 && !memory.get().fortress },
+      { skill: 'hunt_blaze', args: { count: 6 }, need: (b) => countItem(b, 'blaze_rod') < 6 },
+      { skill: 'barter_piglin', args: { count: 12 }, need: (b) => countItem(b, 'ender_pearl') < 12 && countItem(b, 'gold_ingot') > 0 },
+      { skill: 'hunt_enderman', args: { count: 12 }, need: (b) => countItem(b, 'ender_pearl') < 12 },
+      { skill: 'craft_eyes', args: { count: 12 }, need: (b) => countItem(b, 'ender_eye') < 12 },
+      { skill: 'enter_portal', need: (b) => (b?.game?.dimension === 'minecraft:the_nether' || b?.dimension === 'the_nether') && countItem(b, 'blaze_rod') >= 6 && (countItem(b, 'ender_pearl') >= 12 || countItem(b, 'ender_eye') >= 12) },
+      { skill: 'triangulate_stronghold', need: () => !memory.get().stronghold },
+      { skill: 'find_stronghold', need: () => !memory.get().reachedStronghold },
+      { skill: 'activate_end_portal', need: () => !memory.get().endPortalActivated },
+      { skill: 'fight_dragon', need: () => !memory.get().dragonDefeated },
     ],
   },
 };

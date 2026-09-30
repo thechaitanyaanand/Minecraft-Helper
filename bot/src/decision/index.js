@@ -36,6 +36,8 @@ function createDecider(cfg, injected = {}) {
   const jevCallTimestamps = [];
   const maxCallsPerMin = cfg.decision.jev?.maxCallsPerMin || 30;
 
+  let activeFlight = null;
+
   /**
    * Decide action based on state and questions.
    * @param {object} state
@@ -68,19 +70,38 @@ function createDecider(cfg, injected = {}) {
         answers = res.answers;
         lastLatencyMs = Math.max(1, Date.now() - t0);
       } else {
-        try {
-          if (backend === 'jev') jevCallTimestamps.push(Date.now());
-          const raw = await client(state, questions);
-          answers = normalize(raw, questions);
-          lastLatencyMs = Math.max(1, Date.now() - t0);
-          lastError = null;
-        } catch (err) {
-          log.warn(`Decision backend (${backend}) failed, falling back to mock:`, err.message);
-          lastError = err.message;
+        const isBackground = meta.purpose === 'interrupt' || meta.purpose === 'buddy' || Boolean(meta.background);
+        if (activeFlight && isBackground) {
+          lastError = 'dropped_busy';
           fallback = true;
           const res = await mockDecide(state, questions);
           answers = res.answers;
           lastLatencyMs = Math.max(1, Date.now() - t0);
+        } else {
+          if (activeFlight) {
+            try { await activeFlight; } catch (_) {}
+          }
+          const callOpts = { timeoutMs: meta.timeoutMs || (isBackground ? 1500 : (cfg.decision?.timeoutMs || 4000)) };
+          const flight = (async () => {
+            if (backend === 'jev') jevCallTimestamps.push(Date.now());
+            const raw = await client(state, questions, callOpts);
+            return normalize(raw, questions);
+          })();
+          activeFlight = flight;
+          try {
+            answers = await flight;
+            lastLatencyMs = Math.max(1, Date.now() - t0);
+            lastError = null;
+          } catch (err) {
+            log.warn(`Decision backend (${backend}) failed, falling back to mock:`, err.message);
+            lastError = err.message;
+            fallback = true;
+            const res = await mockDecide(state, questions);
+            answers = res.answers;
+            lastLatencyMs = Math.max(1, Date.now() - t0);
+          } finally {
+            if (activeFlight === flight) activeFlight = null;
+          }
         }
       }
     }

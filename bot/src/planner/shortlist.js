@@ -23,6 +23,14 @@ const ALIASES = Object.freeze({
   iron: 'iron_ingot',
   gold: 'gold_ingot',
   copper: 'copper_ingot',
+  diamond: 'diamond',
+  diamonds: 'diamond',
+  obsidian: 'obsidian',
+  blaze: 'blaze_rod',
+  pearl: 'ender_pearl',
+  pearls: 'ender_pearl',
+  eye: 'ender_eye',
+  eyes: 'ender_eye',
 });
 
 // Exact names that almost always mean something else in chat ("get stone" = cobblestone, not smelted stone).
@@ -87,9 +95,9 @@ function parseDirectTarget(text, mcData) {
   }
 
   // Mob check for kill/attack
-  const mobs = ['spider', 'zombie', 'skeleton', 'creeper', 'cow', 'pig', 'sheep', 'chicken', 'drowned', 'enderman'];
+  const mobs = ['spider', 'zombie', 'skeleton', 'creeper', 'cow', 'pig', 'sheep', 'chicken', 'drowned', 'enderman', 'blaze', 'ender_dragon', 'dragon'];
   const mob = mobs.find((m) => words.includes(m) || words.includes(`${m}s`));
-  if (mob) return `mob:${mob}`;
+  if (mob) return mob === 'dragon' ? 'mob:ender_dragon' : `mob:${mob}`;
 
   const alias = Object.keys(ALIASES).find((a) => words.includes(a));
   if (alias) return ALIASES[alias];

@@ -6,34 +6,34 @@ const { createRouter } = require('../src/chat/router');
 test('router ignores messages from the bot itself', () => {
   let called = false;
   const router = createRouter({
-    botUsername: 'Helper',
+    botUsername: 'Butler',
     ownerName: 'Steve',
     onCommand: () => { called = true; },
     onIntentText: () => { called = true; },
   });
 
-  router('Helper', '!help');
+  router('Butler', '!help');
   assert.equal(called, false);
 });
 
 test('router ignores messages from non-owner players', () => {
   let called = false;
   const router = createRouter({
-    botUsername: 'Helper',
+    botUsername: 'Butler',
     ownerName: 'Steve',
     onCommand: () => { called = true; },
     onIntentText: () => { called = true; },
   });
 
   router('Griefer', '!help');
-  router('Stranger', 'helper get wood');
+  router('Stranger', 'butler get wood');
   assert.equal(called, false);
 });
 
 test('router parses !commands for owner', () => {
   const commands = [];
   const router = createRouter({
-    botUsername: 'Helper',
+    botUsername: 'Butler',
     ownerName: 'Steve',
     onCommand: (cmd, rest) => { commands.push({ cmd, rest }); },
   });
@@ -52,15 +52,15 @@ test('router parses !commands for owner', () => {
 test('router parses prefix intent text', () => {
   const intents = [];
   const router = createRouter({
-    botUsername: 'Helper',
+    botUsername: 'Butler',
     ownerName: 'Steve',
-    prefixes: ['helper', '!', '@helper'],
+    prefixes: ['butler', '!', '@butler'],
     onIntentText: (text) => { intents.push(text); },
   });
 
-  router('Steve', 'helper i need wood');
-  router('Steve', 'Helper: make me a pickaxe');
-  router('Steve', '@helper, get food');
+  router('Steve', 'butler i need wood');
+  router('Steve', 'Butler: make me a pickaxe');
+  router('Steve', '@butler, get food');
 
   assert.deepEqual(intents, [
     'i need wood',
@@ -73,7 +73,7 @@ test('router handles yes/no/1/2/3 when pendingQuestion is active', () => {
   const commands = [];
   let pending = true;
   const router = createRouter({
-    botUsername: 'Helper',
+    botUsername: 'Butler',
     ownerName: 'Steve',
     getPendingQuestion: () => pending,
     onCommand: (cmd, rest) => { commands.push({ cmd, rest }); },
@@ -94,7 +94,7 @@ test('router handles yes/no/1/2/3 when pendingQuestion is active', () => {
 test('router ignores regular chat without prefix or command', () => {
   let called = false;
   const router = createRouter({
-    botUsername: 'Helper',
+    botUsername: 'Butler',
     ownerName: 'Steve',
     onCommand: () => { called = true; },
     onIntentText: () => { called = true; },
@@ -107,15 +107,15 @@ test('router ignores regular chat without prefix or command', () => {
 test('router parses prefix at end of message', () => {
   const intents = [];
   const router = createRouter({
-    botUsername: 'Helper',
+    botUsername: 'Butler',
     ownerName: 'Steve',
-    prefixes: ['helper', '!', '@helper'],
+    prefixes: ['butler', '!', '@butler'],
     onIntentText: (text) => { intents.push(text); },
   });
 
-  router('Steve', 'follow me helper');
-  router('Steve', 'give me food, helper');
-  router('Steve', 'stop following me and give me food helper');
+  router('Steve', 'follow me butler');
+  router('Steve', 'give me food, butler');
+  router('Steve', 'stop following me and give me food butler');
 
   assert.deepEqual(intents, [
     'follow me',

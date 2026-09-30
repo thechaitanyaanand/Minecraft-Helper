@@ -1,7 +1,7 @@
 'use strict';
 const os = require('os');
 const path = require('path');
-process.env.MEMORY_FILE = path.join(os.tmpdir(), `helper-talk-test-${process.pid}.json`);
+process.env.MEMORY_FILE = path.join(os.tmpdir(), `butler-talk-test-${process.pid}.json`);
 
 const { test } = require('node:test');
 const assert = require('node:assert/strict');

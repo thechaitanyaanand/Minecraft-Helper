@@ -62,6 +62,17 @@ async function runSkill(skill, bot, ctx, parentToken, args = {}) {
 
         if (dist < 0.5) {
           stationarySeconds += 3;
+          if (stationarySeconds === 6 || stationarySeconds === 9) {
+            try {
+              if (bot.setControlState) {
+                bot.setControlState('jump', true);
+                bot.setControlState('forward', true);
+                setTimeout(() => {
+                  try { bot.setControlState?.('jump', false); } catch (_) {}
+                }, 350);
+              }
+            } catch (_) {}
+          }
           if (stationarySeconds >= 15) {
             childToken.cancel('stuck');
           }

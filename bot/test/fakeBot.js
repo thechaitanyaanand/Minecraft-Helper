@@ -3,7 +3,7 @@ const EventEmitter = require('events');
 const { Vec3 } = require('vec3');
 
 class FakeBot extends EventEmitter {
-  constructor(username = 'Helper') {
+  constructor(username = 'Butler') {
     super();
     this.username = username;
     this.version = '1.20.4';
@@ -28,6 +28,9 @@ class FakeBot extends EventEmitter {
     this.inventory = {
       items: () => this._items || [],
     };
+    this.equip = async () => {};
+    this.lookAt = async () => {};
+    this.consume = async () => {};
     this.entities = {};
     this.players = {};
     this._items = [];

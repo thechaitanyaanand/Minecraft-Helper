@@ -11,7 +11,7 @@ const INTENT_RULES = [
   { intent: 'give_items', regex: /\b(give|drop|hand over|de do|dedo|saman|inventory|toss|maal|giv itms)\b/i },
   { intent: 'explain', regex: /\b(how\b|why\b|what is\b|what's\b|what are\b|what happens\b|explain\b|kaise\b|kya hai\b|kya kaam\b|kya hota\b|batao\b|tell me how)/i },
   { intent: 'follow_me', regex: /\b(follow|folow|piche|saath|aage|chal|stay with|walk behind|tag along|side|keep following)\b/i },
-  { intent: 'come_here', regex: /\b(come here|cm here|idhar aao|mere paas aao|come over|come to|meet me|yahan aao|helper come|walk over)\b/i },
+  { intent: 'come_here', regex: /\b(come here|cm here|idhar aao|mere paas aao|come over|come to|meet me|yahan aao|butler come|walk over)\b/i },
   { intent: 'go_place', regex: /\b(take me|lead me|go to|le chalo|guide me)\b/i },
   { intent: 'survive_night', regex: /(night|dark|raat|shelter|safe|zombie|bachao|chupna|dusk|monsters)/i },
   { intent: 'make_tools', regex: /(pickaxe|picaxe|pikaxe|pick\b|tools?|axe\b|sword|hathoda|tools to stone)/i },

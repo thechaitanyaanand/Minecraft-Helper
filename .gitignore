@@ -9,3 +9,4 @@ server/*
 __pycache__/
 .venv/
 bot/memory.json
+pitch/

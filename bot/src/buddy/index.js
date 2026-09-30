@@ -51,10 +51,10 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     return best;
   }
 
-  function getLegalActions(ownerState, helperHealth, inv, timeOfDay, currentGoal) {
+  function getLegalActions(ownerState, butlerHealth, inv, timeOfDay, currentGoal) {
     const now = Date.now(), legal = ['stay_close'];
     const hasHostiles = (ownerState?.hostiles_near_owner?.length || 0) > 0;
-    if (hasHostiles && (helperHealth > 10 || (ownerState?.health && ownerState.health <= 8))) legal.push('protect_owner');
+    if (hasHostiles && (butlerHealth > 10 || (ownerState?.health && ownerState.health <= 8))) legal.push('protect_owner');
 
     const broke = Object.keys(ownerState?.recent?.broke || {});
     if (broke.find(b => /(log|wood|stem|stone|cobblestone|deepslate|_ore)$/.test(b)) && (!suppressedOffers.has('gather_same') || now >= suppressedOffers.get('gather_same'))) {
@@ -132,9 +132,9 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
     if (plState.mode === 'goal') return;
     if (plState.mode !== 'idle' && plState.mode !== 'buddy' && !dangerTrigger) return;
 
-    const ownerState = observer.getOwnerState(), helperHealth = Math.round(bot.health || 20);
+    const ownerState = observer.getOwnerState(), butlerHealth = Math.round(bot.health || 20);
     // Owner just got hit by something we can see: go after it right away, no model call.
-    const hitBySomething = dangerTrigger && helperHealth > 10 && observer.getLastAttacker?.();
+    const hitBySomething = dangerTrigger && butlerHealth > 10 && observer.getLastAttacker?.();
     if (hitBySomething || (ownerState?.hostiles_near_owner?.length > 0 && ownerState?.health <= 8)) {
       runningAction = 'protect_owner'; actionStartTime = Date.now();
       return executeAction('protect_owner', ownerState, 1.0);
@@ -152,7 +152,7 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
       runningAction = 'gift'; actionStartTime = now;
       return handOver((n) => n === gift.item, gift.count, gift.say);
     }
-    const legal = getLegalActions(ownerState, helperHealth, inv, timeOfDay, plState.currentGoal);
+    const legal = getLegalActions(ownerState, butlerHealth, inv, timeOfDay, plState.currentGoal);
 
     if (legal.length === 1 && legal[0] === 'stay_close') {
       runningAction = 'stay_close'; actionStartTime = now;
@@ -167,7 +167,7 @@ function createBuddy(bot, decider, config, say, planner, observer, opts = {}) {
 
       let chosenAction = 'stay_close', needsHelpP = 0.2;
       try {
-        const res = await decider.decide(state, q, { purpose: 'buddy' });
+        const res = await decider.decide(state, q, { purpose: 'buddy', timeoutMs: 1500 });
         const act = res.answers?.owner_activity?.choice || 'unknown';
         chosenAction = res.answers?.buddy_action?.choice || heuristicPick(act, legal, ownerState);
         needsHelpP = res.answers?.needs_help?.p ?? 0.2;

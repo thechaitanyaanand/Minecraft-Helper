@@ -1,9 +1,9 @@
 'use strict';
 
 function createRouter({
-  botUsername = 'Helper',
+  botUsername = 'Butler',
   ownerName,
-  prefixes = ['helper', '!', '@helper'],
+  prefixes = ['butler', '!', '@butler'],
   onCommand,
   onIntentText,
   getPendingQuestion,
@@ -20,8 +20,8 @@ function createRouter({
     const trimmed = (rawMessage || '').trim();
     if (!trimmed) return;
 
-    // 3. If starts with '!', it is a command
-    if (trimmed.startsWith('!')) {
+    // 3. If starts with '!' or '/', it is a command
+    if (trimmed.startsWith('!') || trimmed.startsWith('/')) {
       const parts = trimmed.slice(1).trim().split(/\s+/);
       const cmd = parts[0].toLowerCase();
       const rest = parts.slice(1).join(' ');

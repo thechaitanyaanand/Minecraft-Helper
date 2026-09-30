@@ -39,6 +39,7 @@ function getMissingKit(bot) {
   if (!bot._bedPlaced && countItemsMatching(bot, /_bed$/) === 0) missing.push({ item: 'white_bed', count: 1, kind: 'bed' });
   if (countItem(bot, 'bow') === 0) missing.push({ item: 'bow', count: 1, kind: 'bow' });
   if (countItem(bot, 'arrow') < 16) missing.push({ item: 'arrow', count: 32, kind: 'arrow' });
+  if (countItem(bot, 'crafting_table') < 1) missing.push({ item: 'crafting_table', count: 64, kind: 'crafting_table' });
   for (const [, idx, item, re] of KIT_ARMOR) {
     if (!bot.inventory?.slots?.[idx] && countItemsMatching(bot, re) === 0) missing.push({ item, count: 1, kind: 'armor' });
   }
@@ -65,7 +66,7 @@ function replenishKit(bot, config = {}, options = {}) {
     return { ok: true, replenished: [] };
   }
   if (bot) bot._lastReplenish = now;
-  const username = bot.username || 'Helper';
+  const username = bot.username || 'Butler';
   for (const entry of missing) {
     try {
       bot.chat(`/give ${username} ${entry.item} ${entry.count}`);

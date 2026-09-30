@@ -13,7 +13,26 @@ const { plan, getHave } = require('./obtain');
 
 // Runaway guard only; real stall detection is MAX_IDLE_STEPS (steps in a row that changed nothing).
 const MAX_STEPS = 300, MAX_IDLE_STEPS = 8, MAX_EXPLORES = 4, MAX_RETRIES = 3, AUTOPILOT_MAX_FAILS = 5;
-const ALIASED_GOALS = { get_wood: 'obtain:group:logs:8', make_tools: 'obtain:stone_pickaxe:1', get_food: 'obtain:group:food:4' };
+const ALIASED_GOALS = {
+  get_wood: 'obtain:group:logs:8',
+  make_tools: 'obtain:stone_pickaxe:1',
+  get_food: 'obtain:group:food:4',
+  diamonds: 'deep_mine',
+  gather_diamonds: 'deep_mine',
+  nether: 'enter_nether',
+  nether_portal: 'enter_nether',
+  portal: 'enter_nether',
+  blaze_rods: 'get_blaze_rods',
+  blaze: 'get_blaze_rods',
+  fortress: 'get_blaze_rods',
+  ender_pearls: 'gather_ender_pearls',
+  pearls: 'gather_ender_pearls',
+  eyes: 'craft_eyes_of_ender',
+  stronghold: 'find_stronghold',
+  end_portal: 'activate_end_portal',
+  dragon: 'defeat_ender_dragon',
+  ender_dragon: 'defeat_ender_dragon',
+};
 const TRIP_SKILLS = new Set(['come_to_owner', 'give_to_owner', 'go_to', 'recover_items']);
 const WEAR_SLOT =[[/_helmet$/, 'head'], [/_chestplate$/, 'torso'], [/_leggings$/, 'legs'], [/_boots$/, 'feet'], [/^shield$/, 'off-hand']];
 
@@ -33,7 +52,7 @@ function createPlanner(bot, decider, config, say) {
   const skipped = () => new Set([...failedUntil].filter(([, t]) => t > Date.now()).map(([k]) => k));
 
   const progressTimer = setInterval(() => {
-    if (mode !== 'idle' && currentStepName !== 'wait_for_day' && Date.now() - lastSaidTime >= 60_000) speak(`Still working on ${templates.goalLabel(currentGoalId)}...`);
+    if (mode !== 'idle' && !['follow_me', 'come_here'].includes(currentGoalId) && !['wait_for_day', 'come_to_owner', 'follow_owner'].includes(currentStepName) && Date.now() - lastSaidTime >= 60_000) speak(`Still working on ${templates.goalLabel(currentGoalId)}...`);
   }, 5000);
   if (progressTimer.unref) progressTimer.unref();
 
@@ -69,10 +88,15 @@ function createPlanner(bot, decider, config, say) {
     if (!chosenAction) {
       const legal = legalNow(state);
       if (legal.length <= 1) return null;
+      const pick = heuristicInterrupt(state, legal);
+      if (pick === 'continue_task') {
+        interruptCooldownUntil = Date.now() + 5000;
+        return null;
+      }
       const q = questions.interrupt(legal);
       if (!q) return null;
-      const res = await decider.decide(state, q, { purpose: 'interrupt', heuristicPick: heuristicInterrupt(state, legal) });
-      chosenAction = res.answers?.interrupt?.choice;
+      const res = await decider.decide(state, q, { purpose: 'interrupt', heuristicPick: pick, timeoutMs: 1500 });
+      chosenAction = res.answers?.interrupt?.choice || pick;
     }
     if (!chosenAction || chosenAction === 'continue_task') { interruptCooldownUntil = Date.now() + 10_000; return null; }
     log.warn(`[Planner] Interrupting with action: ${chosenAction}`);
@@ -141,15 +165,15 @@ function createPlanner(bot, decider, config, say) {
       if (!item) return { status: 'done', key };
       rId = `obtain:${item}:1`; key = item;
     }
-    const isObtain = rId.startsWith('obtain:'), isBp = rId.startsWith('blueprint:'), isMob = rId.startsWith('mob:'), isGoto = rId.startsWith('goto:');
+    const isObtain = rId.startsWith('obtain:'), isBp = rId.startsWith('blueprint:'), isMob = rId.startsWith('mob:'), isGoto = rId.startsWith('goto:'), isExplore = rId === 'explore';
     let tgt = '', count = 1;
     if (isObtain) {
       const rest = rId.slice('obtain:'.length), idx = rest.lastIndexOf(':');
       tgt = idx !== -1 ? rest.slice(0, idx) : rest;
       count = parseInt(idx !== -1 ? rest.slice(idx + 1) : '1', 10) || 1;
     }
-    const goal = (isObtain || isBp || isMob || isGoto) ? null : GOALS[rId];
-    if (!goal && !isObtain && !isBp && !isMob && !isGoto) { speak(`Unknown goal: ${goalId}`); return { status: 'failed', key }; }
+    const goal = (isObtain || isBp || isMob || isGoto || isExplore) ? null : GOALS[rId];
+    if (!goal && !isObtain && !isBp && !isMob && !isGoto && !isExplore) { speak(`Unknown goal: ${goalId}`); return { status: 'failed', key }; }
 
     const fail = (what, reason) => { speak(templates.stepFailed(what, reason)); return { status: 'failed', key }; };
     const finish = async () => {
@@ -193,10 +217,21 @@ function createPlanner(bot, decider, config, say) {
           step = { skill: 'build_blueprint', args: { id: bpId } };
         }
       } else if (isMob) {
-        step = { skill: 'fight', args: { mobNames: [rId.replace('mob:', '')], count: 1 } };
+        const mob = rId.replace('mob:', '');
+        if (mob === 'ender_dragon' || mob === 'dragon') {
+          step = { skill: 'fight_dragon' };
+        } else if (mob === 'blaze') {
+          step = { skill: 'hunt_blaze', args: { count: 1 } };
+        } else if (mob === 'enderman') {
+          step = { skill: 'hunt_enderman', args: { count: 1 } };
+        } else {
+          step = { skill: 'fight', args: { mobNames: [mob], count: 1 } };
+        }
       } else if (isGoto) {
         const [x, y, z] = rId.slice('goto:'.length).split(',').map(Number);
         step = { skill: 'go_to', args: { pos: { x, y, z } } };
+      } else if (isExplore) {
+        step = { skill: 'explore', args: { distance: 35 } };
       } else {
         if (goal.done(bot, makeCtx())) return finish();
         step = getFirstNeededStep(goal, bot, makeCtx());
@@ -211,7 +246,7 @@ function createPlanner(bot, decider, config, say) {
       currentStepName = step.skill;
       const skill = getSkill(step.skill);
       if (!skill) return fail(step.skill, 'missing_skill');
-      if (bot.pathfinder && bot.version) {
+      if (typeof bot.pathfinder?.setMovements === 'function' && bot.version) {
         const { safeMovements } = require('../safety/movements');
         bot.pathfinder.setMovements(safeMovements(bot, require('minecraft-data')(bot.version)));
       }
@@ -229,18 +264,19 @@ function createPlanner(bot, decider, config, say) {
         continue;
       }
 
-      // Progress = inventory changed. A timed-out collect that still got 5 of 8 logs is progress, not a failure.
+      // Progress = inventory changed or skill completed successfully.
       const sig = JSON.stringify(invMap(bot));
       const progressed = sig !== lastSig;
       lastSig = sig;
-      idleSteps = progressed ? 0 : idleSteps + 1;
+      idleSteps = (progressed || res.ok) ? 0 : idleSteps + 1;
 
       if (res.ok || progressed) {
         if (opts.learn) speak(templates.stepDone(step.skill, res.message));
         retries = 0; lastFailedStep = null;
         if (isBp && step.skill === 'build_blueprint' && res.ok) return finish();
-        if (isMob && step.skill === 'fight' && res.ok) return finish();
+        if (isMob && ['fight', 'fight_dragon', 'hunt_blaze', 'hunt_enderman'].includes(step.skill) && res.ok) return finish();
         if (isGoto && res.ok) return finish();
+        if (isExplore && res.ok) return finish();
         continue;
       }
 
@@ -249,6 +285,12 @@ function createPlanner(bot, decider, config, say) {
       // Exploring helps find trees or animals, not reach a fixed spot: it would walk away from the owner.
       const isTrip = TRIP_SKILLS.has(step.skill);
       if (!isTrip && ['no_target', 'no_path', 'stuck'].includes(res.reason) && explores < MAX_EXPLORES) {
+        const isDeepOreTask = step.skill === 'collect_block' && (step.args?.dropName === 'diamond' || step.args?.blockNames?.some((n) => n && n.includes('diamond')));
+        if (isDeepOreTask) {
+          if (explores++ === 0) speak('Diamonds are deep underground! Starting a deep mining expedition to Y=-58.');
+          await runSkill(getSkill('deep_mine'), bot, makeCtx(), goalToken, { count: step.args?.count || 1 });
+          continue;
+        }
         if (explores++ === 0) speak(`Nothing reachable for ${templates.goalLabel(goalId)} nearby — exploring.`);
         await runSkill(getSkill('explore'), bot, makeCtx(), goalToken, { distance: 30 + explores * 15 });
         continue;

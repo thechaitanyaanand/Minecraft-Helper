@@ -10,7 +10,7 @@
     <!-- 1 message -->
     <rect x="40" y="90" width="220" height="64" rx="10" fill="#ecfdf5" stroke="#10b981" stroke-width="2"/>
     <text x="150" y="117" text-anchor="middle" font-weight="700" fill="#065f46">Owner types</text>
-    <text x="150" y="138" text-anchor="middle" fill="#065f46">"helper lakdi chahiye"</text>
+    <text x="150" y="138" text-anchor="middle" fill="#065f46">"butler lakdi chahiye"</text>
 
     <!-- 2 router -->
     <rect x="310" y="90" width="220" height="64" rx="10" fill="#f8fafc" stroke="#64748b" stroke-width="2"/>

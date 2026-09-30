@@ -1,13 +1,15 @@
 'use strict';
+const { Vec3 } = require('vec3');
 
 const HOSTILE_MOBS = new Set([
   'zombie', 'husk', 'drowned', 'skeleton', 'stray', 'creeper',
   'spider', 'cave_spider', 'witch', 'slime', 'phantom',
   'zombie_villager', 'pillager', 'enderman',
+  'blaze', 'ghast', 'magma_cube', 'piglin_brute', 'silverfish', 'ender_dragon',
 ]);
 
 // Mobs that shoot from range: worth answering with a bow instead of chasing.
-const RANGED_MOBS = new Set(['skeleton', 'stray', 'pillager']);
+const RANGED_MOBS = new Set(['skeleton', 'stray', 'pillager', 'blaze', 'ghast']);
 
 const FOOD_MOBS = new Set([
   'cow', 'pig', 'chicken', 'sheep', 'rabbit', 'mooshroom',
@@ -40,12 +42,12 @@ function timeOfDayLabel(t) {
 
 function countItem(bot, name) {
   if (!bot?.inventory?.items) return 0;
-  return bot.inventory.items().reduce((acc, it) => (it.name === name ? acc + it.count : acc), 0);
+  return bot.inventory.items().reduce((acc, it) => (it.name === name ? acc + (typeof it.count === 'number' ? it.count : 1) : acc), 0);
 }
 
 function countItemsMatching(bot, regex) {
   if (!bot?.inventory?.items) return 0;
-  return bot.inventory.items().reduce((acc, it) => (regex.test(it.name) ? acc + it.count : acc), 0);
+  return bot.inventory.items().reduce((acc, it) => (regex.test(it.name) ? acc + (typeof it.count === 'number' ? it.count : 1) : acc), 0);
 }
 
 // items() skips the off-hand slot (45), where an equipped shield lives.
@@ -116,6 +118,98 @@ function ownerEntity(bot, ownerName) {
   return bot.players?.[ownerName]?.entity || null;
 }
 
+function isOwnerKnown(bot, ownerName) {
+  if (!bot || !ownerName) return false;
+  return Boolean(bot.players?.[ownerName] || ownerEntity(bot, ownerName) || bot._lastOwnerPos);
+}
+
+let pendingQuery = null;
+
+function queryOwnerPos(bot, ownerName, timeoutMs = 1200) {
+  if (!bot || !ownerName || typeof bot.chat !== 'function') return Promise.resolve(null);
+  if (pendingQuery) return pendingQuery;
+
+  pendingQuery = new Promise((resolve) => {
+    let timer = null;
+    const onMessage = (jsonMsg) => {
+      const str = typeof jsonMsg === 'string' ? jsonMsg : (jsonMsg?.toString?.() || '');
+      if (str.includes(ownerName) && str.includes('has the following entity data:')) {
+        const m = str.match(/has the following entity data:\s*\[\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)[a-zA-Z]?,?\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)[a-zA-Z]?,?\s*(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)[a-zA-Z]?\s*\]/i);
+        if (m) {
+          cleanup();
+          const pos = new Vec3(parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]));
+          bot._lastOwnerPos = pos;
+          bot._lastOwnerPosTime = Date.now();
+          resolve(pos);
+        }
+      } else if (str.includes('No entity was found') || str.includes('Player not found')) {
+        cleanup();
+        resolve(null);
+      }
+    };
+
+    const cleanup = () => {
+      if (timer) clearTimeout(timer);
+      if (bot.removeListener) bot.removeListener('message', onMessage);
+    };
+
+    timer = setTimeout(() => {
+      cleanup();
+      resolve(null);
+    }, timeoutMs);
+
+    if (bot.on) bot.on('message', onMessage);
+    try {
+      bot.chat(`/data get entity ${ownerName} Pos`);
+    } catch (_) {
+      cleanup();
+      resolve(null);
+    }
+  }).finally(() => {
+    pendingQuery = null;
+  });
+
+  return pendingQuery;
+}
+
+async function resolveOwnerPos(bot, ownerName) {
+  if (!bot || !ownerName) return null;
+  const ent = ownerEntity(bot, ownerName);
+  if (ent?.position) {
+    const p = ent.position.clone ? ent.position.clone() : new Vec3(ent.position.x, ent.position.y, ent.position.z);
+    bot._lastOwnerPos = p;
+    bot._lastOwnerPosTime = Date.now();
+    return p;
+  }
+
+  if (bot._lastOwnerPos && (Date.now() - (bot._lastOwnerPosTime || 0)) < 1500) {
+    return bot._lastOwnerPos;
+  }
+
+  if (bot.players?.[ownerName] && typeof bot.chat === 'function') {
+    const queried = await queryOwnerPos(bot, ownerName);
+    if (queried) return queried;
+  }
+
+  return bot._lastOwnerPos || null;
+}
+
+function parseCoords(text) {
+  if (!text || typeof text !== 'string') return null;
+  const labeled = text.match(/(?:x\s*[:=]\s*(-?\d+(?:\.\d+)?)[,\s]+y\s*[:=]\s*(-?\d+(?:\.\d+)?)[,\s]+z\s*[:=]\s*(-?\d+(?:\.\d+)?))/i);
+  if (labeled) {
+    return new Vec3(parseFloat(labeled[1]), parseFloat(labeled[2]), parseFloat(labeled[3]));
+  }
+  const m = text.match(/(?:^|[^\d.-])(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)[,\s]+(-?\d+(?:\.\d+)?)(?:[^\d.-]|$)/);
+  if (m) {
+    const x = parseFloat(m[1]), y = parseFloat(m[2]), z = parseFloat(m[3]);
+    if (Number.isFinite(x) && Number.isFinite(y) && Number.isFinite(z)) {
+      return new Vec3(x, y, z);
+    }
+  }
+  return null;
+}
+
 function checkNames(mcData, extraNames = []) {
   if (!mcData) throw new Error('checkNames: mcData is required');
   const allNames = [...CHECKED_NAMES, ...extraNames];
@@ -149,5 +243,10 @@ module.exports = {
   logBlockIds,
   hostilesNear,
   ownerEntity,
+  isOwnerKnown,
+  queryOwnerPos,
+  resolveOwnerPos,
+  parseCoords,
   checkNames,
 };
+

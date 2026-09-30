@@ -38,6 +38,19 @@ module.exports = {
     if (args.needsTool && bestToolTier(bot, args.needsTool) === 'none') {
       return { ok: false, reason: 'no_tool' };
     }
+    const blocks = Array.isArray(args.blockNames) ? args.blockNames : [args.blockNames].filter(Boolean);
+    if (blocks.includes('obsidian')) {
+      const tier = bestToolTier(bot, 'pickaxe');
+      if (tier !== 'diamond' && tier !== 'netherite') {
+        return { ok: false, reason: 'insufficient_tool_tier', message: 'Need diamond pickaxe to mine obsidian' };
+      }
+    }
+    if (blocks.some((b) => b && (b.includes('diamond_ore') || b.includes('gold_ore')))) {
+      const tier = bestToolTier(bot, 'pickaxe');
+      if (tier !== 'iron' && tier !== 'diamond' && tier !== 'netherite') {
+        return { ok: false, reason: 'insufficient_tool_tier', message: 'Need iron pickaxe or better to mine diamond ore' };
+      }
+    }
     return { ok: true };
   },
 
@@ -89,6 +102,11 @@ module.exports = {
     });
 
     if (safePositions.length === 0) {
+      const isDeepOre = blockNames.some((n) => n && (n.includes('diamond_ore') || n.includes('deepslate_diamond_ore')));
+      if (isDeepOre && (pos?.y ?? 64) > -40) {
+        const deepMine = require('./deepMine');
+        return await deepMine.run(bot, ctx, token, { targetOre: blockNames, count, dropName });
+      }
       return { ok: false, reason: 'no_target' };
     }
 

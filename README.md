@@ -1,9 +1,9 @@
-# Minecraft Helper: a System-1 companion for Minecraft
+# Minecraft Butler: a System-1 companion for Minecraft
 
 A Minecraft companion bot that plays **with** you. It gathers, crafts, fights, protects you, sleeps when you sleep, fetches your items after you die, remembers places, and chats in English and Hinglish. Every decision comes from a small, fast, **calibrated classifier** (the *Decider*) choosing among options that code has already checked. There is no chat LLM and no cloud API, and a decision takes about 185 ms on a laptop GPU.
 
 <p align="center">
-  <img src="docs/images/live-view.png" alt="The helper's live view: vitals, the latest buddy decision with the Decider's probabilities, a minimap, chat and decision history" width="820">
+  <img src="docs/images/live-view.png" alt="The butler's live view: vitals, the latest buddy decision with the Decider's probabilities, a minimap, chat and decision history" width="820">
   <br><em>The live view at <code>http://127.0.0.1:3000</code> showing a real buddy-mode decision. The Decider judged the owner "idle" (83 %) and chose to "stay close" (86 %).</em>
 </p>
 
@@ -16,7 +16,7 @@ A Minecraft companion bot that plays **with** you. It gathers, crafts, fights, p
 - [Full installation](#full-installation)
 - [Configuration](#configuration)
 - [Running it](#running-it)
-- [Talking to the helper](#talking-to-the-helper)
+- [Talking to the butler](#talking-to-the-butler)
 - [Testing and evaluation](#testing-and-evaluation)
 - [Troubleshooting](#troubleshooting)
 - [Technical report: how it works](#technical-report-how-it-works)
@@ -26,7 +26,7 @@ A Minecraft companion bot that plays **with** you. It gathers, crafts, fights, p
 
 ## What it can do
 
-| Area | What the helper does |
+| Area | What the butler does |
 |---|---|
 | **Get anything** | "get 10 iron", "make me a bucket", "i need torches". It plans the full recipe tree from game data: chop, mine, smelt, craft. |
 | **Build** | "build a hut" / "build a big house" from JSON blueprints (`hut_5x5`, `hut_7x7`). |
@@ -56,10 +56,10 @@ copy .env.example .env      # then set OWNER_NAME to your exact in-game name
 # 3. Bot
 cd bot
 npm install
-npm start                   # joins as "Helper"; live view at http://127.0.0.1:3000
+npm start                   # joins as "Butler"; live view at http://127.0.0.1:3000
 ```
 
-Join `127.0.0.1` from Minecraft Java **1.20.4** and type `helper get wood` in chat.
+Join `127.0.0.1` from Minecraft Java **1.20.4** and type `butler get wood` in chat.
 
 ---
 
@@ -104,9 +104,9 @@ Download the **Temurin 21 JDK, Windows x64, .zip** from [adoptium.net](https://a
 4. Start the server again, then in its console run:
    ```
    whitelist add <YourName>
-   whitelist add Helper
+   whitelist add Butler
    op <YourName>
-   op Helper            # the starter kit uses /give
+   op Butler            # the starter kit uses /give
    ```
 
 ### 3. The bot
@@ -141,10 +141,10 @@ All settings live in `.env` at the repository root.
 
 | Key | Default | Meaning |
 |---|---|---|
-| `OWNER_NAME` | — (required) | Your in-game name. The helper only obeys this player. |
-| `BOT_USERNAME` | `Helper` | The bot's name |
+| `OWNER_NAME` | — (required) | Your in-game name. The butler only obeys this player. |
+| `BOT_USERNAME` | `Butler` | The bot's name |
 | `MC_HOST` / `MC_PORT` / `MC_VERSION` | `127.0.0.1` / `25565` / `1.20.4` | Server address |
-| `CHAT_PREFIXES` | `helper,!,@helper` | How you address the helper |
+| `CHAT_PREFIXES` | `butler,!,@butler` | How you address the butler |
 | `DECISION_BACKEND` | `mock` | `local` (WSL Decider), `mock` (keyword rules), `jev` (hosted API) |
 | `DECISION_TIMEOUT_MS` | `4000` | Per decision. On timeout it falls back to mock. |
 | `CONF_ACT` / `CONF_ASK` | `0.70` / `0.45` | Confidence gate: act / ask "did you mean…?" / offer a pick list |
@@ -163,17 +163,17 @@ Start these in order, each in its own terminal:
 ```text
 1. server\start.bat                              Paper server
 2. (WSL)  decider-server/start_wsl.sh            Decider, if DECISION_BACKEND=local
-3. cd bot && npm start                           the helper joins the world
+3. cd bot && npm start                           the butler joins the world
 4. open http://127.0.0.1:3000                    live view (optional)
 ```
 
-> **After changing any code, restart step 3.** Node does not reload files: a running helper keeps the code it started with.
+> **After changing any code, restart step 3.** Node does not reload files: a running butler keeps the code it started with.
 
 ---
 
-## Talking to the helper
+## Talking to the butler
 
-Start a message with `helper` (or end it with `helper`), or use a `!command`. Only `OWNER_NAME` is obeyed.
+Start a message with `butler` (or end it with `butler`), or use a `!command`. Only `OWNER_NAME` is obeyed.
 
 ### Commands
 
@@ -191,20 +191,20 @@ Start a message with `helper` (or end it with `helper`), or use a `!command`. On
 | `!sethome` / `!home` | Remember this spot as home / go home |
 | `!stuff` | Fetch the items you dropped when you died |
 | `!where` | Home, chests and where you last died |
-| `yes` / `no` / `1` `2` `3` | Answer the helper's questions |
+| `yes` / `no` / `1` `2` `3` | Answer the butler's questions |
 
 ### Things you can just say
 
 ```text
-helper get wood                    helper lakdi chahiye
-helper make me a stone pickaxe     helper get 10 iron
-helper build a hut                 helper kill that zombie
-helper play for me                 helper follow me
-helper how do i find diamonds      helper how to make a bucket
-helper tell me a joke              helper what time is it
-helper remember my farm is here    helper take me to the farm
-helper set home                    helper get my stuff
-helper what do i like              helper forget the farm
+butler get wood                    butler lakdi chahiye
+butler make me a stone pickaxe     butler get 10 iron
+butler build a hut                 butler kill that zombie
+butler play for me                 butler follow me
+butler how do i find diamonds      butler how to make a bucket
+butler tell me a joke              butler what time is it
+butler remember my farm is here    butler take me to the farm
+butler set home                    butler get my stuff
+butler what do i like              butler forget the farm
 ```
 
 ---
@@ -227,12 +227,12 @@ npm run eval      # runs 175 labelled chat lines through the configured backend
 |---|---|
 | A new feature doesn't work | The running bot predates the change. Stop it with Ctrl+C and run `npm start` again. |
 | `Config error: OWNER_NAME is missing` | Set `OWNER_NAME` in the root `.env`. |
-| The helper ignores you | `OWNER_NAME` must match your name exactly, including case. Start messages with `helper`. |
-| The helper can't break or place near spawn | `spawn-protection=0` in `server.properties` |
-| No starter kit | The helper needs op for `/give`: run `op Helper` in the server console. |
+| The butler ignores you | `OWNER_NAME` must match your name exactly, including case. Start messages with `butler`. |
+| The butler can't break or place near spawn | `spawn-protection=0` in `server.properties` |
+| No starter kit | The butler needs op for `/give`: run `op Butler` in the server console. |
 | Chat messages vanish or you get kicked for chat | `enforce-secure-profile=false` |
 | "Decision backend (local) failed, falling back to mock" | The Decider isn't running, or WSL networking is down. Check `curl localhost:8000/health` inside WSL and `smoke_test.ps1` from Windows. |
-| The helper doesn't sleep | Monsters within about 8 blocks block sleeping, for the helper just like for you. |
+| The butler doesn't sleep | Monsters within about 8 blocks block sleeping, for the butler just like for you. |
 | "I can't reach you" | Your spot is unreachable (walled in, water, far up). Come closer, or `!stop`. |
 
 ---
@@ -265,7 +265,7 @@ This project takes the opposite position, loosely following Kahneman's *System 1
 
 ### 3. System architecture
 
-<p align="center"><img src="docs/images/architecture.svg" alt="Architecture: player, Paper server, helper bot, Decider in WSL, live view, memory file" width="820"></p>
+<p align="center"><img src="docs/images/architecture.svg" alt="Architecture: player, Paper server, butler bot, Decider in WSL, live view, memory file" width="820"></p>
 
 Four processes run on one PC. The player's client and the bot both connect to a local Paper server. To the server, the bot is simply another player, driven by [Mineflayer](https://github.com/PrismarineJS/mineflayer) with the pathfinder and collect-block plugins. The bot sends decisions to the Decider over HTTP (`POST /v1/systemone`) and streams its state to a browser dashboard over Server-Sent Events.
 
@@ -274,9 +274,9 @@ sequenceDiagram
     autonumber
     participant P as Player
     participant S as Paper server
-    participant B as Helper bot
+    participant B as Butler bot
     participant D as Decider (GPU)
-    P->>S: chat "helper i need woood"
+    P->>S: chat "butler i need woood"
     S->>B: chat event
     B->>B: router (owner? prefix?) and build state JSON
     B->>D: state + {intent: choice over 15 options}
@@ -284,7 +284,7 @@ sequenceDiagram
     B->>B: gate ≥ 0.70 → plan: obtain oak_log ×8
     B->>S: walk, dig, pick up (Mineflayer)
     B->>S: chat "Chopping logs (target: 8)..."
-    S->>P: helper chats and works
+    S->>P: butler chats and works
 ```
 
 ### 4. The decision layer
@@ -309,7 +309,7 @@ Each option has a short 3–15-word description. The small model relies on those
 | `buddy_action` | every 8 s in buddy mode | stay_close, protect_owner, gather_same, bring_materials, give_food, build_shelter_near_owner, scout_ahead, continue_own_task |
 | `answer` | a question or small talk | ≤ 12 shortlisted replies + `none` (§8) |
 
-**Confidence gate.** The calibrated confidence decides how the helper responds:
+**Confidence gate.** The calibrated confidence decides how the butler responds:
 
 | Top-1 confidence | Behaviour |
 |---|---|
@@ -319,7 +319,7 @@ Each option has a short 3–15-word description. The small model relies on those
 
 <p align="center"><img src="docs/images/decision-pipeline.svg" alt="Pipeline from chat message through router, fast paths, Decider intent pass, keyword second opinion, then act/talk/memory branches" width="880"></p>
 
-**Legality filtering beats instruction.** Early play-testing showed a failure mode: with `flee` always on the interrupt menu, the model sometimes chose to run from a lone zombie even though the helper was healthy and armed. Rather than tune descriptions, `flee` is now only offered when fighting is not a sure thing: the helper is hurt, the mob is a creeper and it has no shield, or it is outnumbered. The general lesson is to **shape the option set, not the model**.
+**Legality filtering beats instruction.** Early play-testing showed a failure mode: with `flee` always on the interrupt menu, the model sometimes chose to run from a lone zombie even though the butler was healthy and armed. Rather than tune descriptions, `flee` is now only offered when fighting is not a sure thing: the butler is hurt, the mob is a creeper and it has no shield, or it is outnumbered. The general lesson is to **shape the option set, not the model**.
 
 **Fallbacks.** If the backend errors or times out (4 s), the mock backend answers the same question with keyword rules and the same response shape. If the model answers `unclear` with confidence below 0.6, the keyword rules get a second opinion. They know Hinglish and common typos ("idhar aao" → come_here, "ruko" → stop) but defer to any confident model answer and ignore prompt-injection text.
 
@@ -378,7 +378,7 @@ The plan is recomputed after every step from the current inventory, so it natura
 
 Hard safety rules run **before** the model and cannot be vetoed: standing in lava or on fire → flee; a creeper within 4 blocks without a usable shield → flee; health ≤ 4 with a hostile within 8 → flee. Every second, a reflex check can cancel a long step (chopping, mining) when danger or hunger appears, then ask the `interrupt` question with only legal options.
 
-**Combat routine.** The helper equips its best sword and keeps a **shield** raised between swings. A shield only blocks what it faces, so it keeps looking at the target, which includes absorbing a creeper blast from the front. It lowers the shield just to swing, with a 600 ms cooldown. Against skeletons, strays and pillagers more than 6 blocks away it switches to the **bow**. It aims at the target's upper body plus an allowance for arrow drop (about 0.003·d² blocks at full draw) and draws for 1.1 s. It leaves a fight at health ≤ 8, then flees or eats. When hurt, eating tops the food bar up to full, since full food plus saturation is what regenerates health.
+**Combat routine.** The butler equips its best sword and keeps a **shield** raised between swings. A shield only blocks what it faces, so it keeps looking at the target, which includes absorbing a creeper blast from the front. It lowers the shield just to swing, with a 600 ms cooldown. Against skeletons, strays and pillagers more than 6 blocks away it switches to the **bow**. It aims at the target's upper body plus an allowance for arrow drop (about 0.003·d² blocks at full draw) and draws for 1.1 s. It leaves a fight at health ≤ 8, then flees or eats. When hurt, eating tops the food bar up to full, since full food plus saturation is what regenerates health.
 
 ### 8. Buddy mode and conversation
 
@@ -386,7 +386,7 @@ Hard safety rules run **before** the model and cannot be vetoed: standing in lav
 
 **Defending the owner is event-driven, not polled.** Minecraft does not report who dealt damage, so the attacker is inferred: the nearest melee mob within 4 blocks of the owner, otherwise the nearest ranged mob within 20. When the owner is hurt, or **swings at a hostile mob within 4 blocks**, the planner pauses whatever step is running (even following), fights, then resumes the paused goal. This needs no model call, since someone hitting the owner is not a judgement call.
 
-**Sleeping together.** The helper counts as a player, so the night only skips if it sleeps too. When the owner gets into bed (the `entitySleep` event from the pose metadata), the helper walks over, uses a free bed nearby or places the one from its kit, sleeps until the owner wakes, then picks its bed up and resumes its previous goal.
+**Sleeping together.** The butler counts as a player, so the night only skips if it sleeps too. When the owner gets into bed (the `entitySleep` event from the pose metadata), the butler walks over, uses a free bed nearby or places the one from its kit, sleeps until the owner wakes, then picks its bed up and resumes its previous goal.
 
 **Conversation without generation.** For questions and small talk, code assembles candidate replies from five sources. Each candidate is scored by keyword-phrase hits plus the best character-trigram similarity between any message word and a keyword (so "diamons" still matches "diamonds"). At most 12 are shortlisted, and the Decider picks one or `none`.
 

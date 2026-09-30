@@ -13,6 +13,12 @@ const smelt = require('./smelt');
 const buildBlueprint = require('./buildBlueprint');
 const { goTo, recoverItems } = require('./places');
 const sleep = require('./sleep');
+const deepMine = require('./deepMine');
+const { buildPortal, enterPortal } = require('./netherPortal');
+const { findFortress, huntBlaze } = require('./netherFortress');
+const { barterPiglin, huntEnderman } = require('./barter');
+const { triangulateSkill, findStronghold, activateEndPortal } = require('./stronghold');
+const { fightDragon } = require('./dragonFight');
 const { FOOD_MOBS, timeOfDayLabel } = require('../state/world');
 
 const ALL_LOG_NAMES = Object.freeze([
@@ -39,6 +45,17 @@ const skills = {
   go_to: goTo,
   recover_items: recoverItems,
   sleep_with_owner: sleep,
+  deep_mine: deepMine,
+  build_portal: buildPortal,
+  enter_portal: enterPortal,
+  find_fortress: findFortress,
+  hunt_blaze: huntBlaze,
+  barter_piglin: barterPiglin,
+  hunt_enderman: huntEnderman,
+  triangulate_stronghold: triangulateSkill,
+  find_stronghold: findStronghold,
+  activate_end_portal: activateEndPortal,
+  fight_dragon: fightDragon,
 };
 
 const aliases = {
@@ -127,6 +144,53 @@ const aliases = {
       mobNames: Array.from(FOOD_MOBS),
       ...args,
     }),
+  },
+  mine_diamonds: {
+    name: 'mine_diamonds',
+    describe: 'descend safely to Y=-58 and mine diamonds',
+    timeoutMs: 120_000,
+    isAvailable: (bot, ctx, args) => deepMine.isAvailable(bot, ctx, args),
+    run: (bot, ctx, token, args = {}) => deepMine.run(bot, ctx, token, {
+      count: args.count || 3,
+      ...args,
+    }),
+  },
+  build_nether_portal: {
+    name: 'build_nether_portal',
+    describe: 'build a 4x5 obsidian portal and light it',
+    timeoutMs: 60_000,
+    isAvailable: (bot, ctx, args) => buildPortal.isAvailable(bot, ctx, args),
+    run: (bot, ctx, token, args = {}) => buildPortal.run(bot, ctx, token, args),
+  },
+  craft_eyes: {
+    name: 'craft_eyes',
+    describe: 'craft blaze powder and eyes of ender',
+    timeoutMs: 30_000,
+    run: async (bot, ctx, token, args = {}) => {
+      const { countItem } = require('../state/world');
+      const neededEyes = args.count || 12;
+      const currentEyes = countItem(bot, 'ender_eye');
+      const missingEyes = Math.max(0, neededEyes - currentEyes);
+      const currentPowder = countItem(bot, 'blaze_powder');
+      if (currentPowder < missingEyes && countItem(bot, 'blaze_rod') > 0) {
+        const rodsToCraft = Math.ceil((missingEyes - currentPowder) / 2);
+        try {
+          await craft.run(bot, ctx, token, { item: 'blaze_powder', runs: rodsToCraft });
+        } catch (_) {}
+      }
+      return craft.run(bot, ctx, token, {
+        item: 'ender_eye',
+        count: missingEyes || 1,
+        ...args,
+      });
+    },
+  },
+  defeat_dragon: {
+    name: 'defeat_dragon',
+    describe: 'enter the End and defeat the Ender Dragon',
+    timeoutMs: 300_000,
+    isAvailable: (bot, ctx, args) => fightDragon.isAvailable(bot, ctx, args),
+    run: (bot, ctx, token, args = {}) => fightDragon.run(bot, ctx, token, args),
   },
 };
 

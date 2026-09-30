@@ -132,3 +132,65 @@ test('clearCeilingIfUnderground: clears ceiling block when owner is above', asyn
   assert.ok(dugBlock);
   assert.equal(dugBlock.name, 'dirt');
 });
+
+test('parseCoords: correctly parses coordinate variations and rejects non-coordinates', () => {
+  const { parseCoords } = require('../src/state/world');
+  const c1 = parseCoords('100 64 200');
+  assert.deepEqual([c1.x, c1.y, c1.z], [100, 64, 200]);
+
+  const c2 = parseCoords('come to -38.5, 66.9, 18.6');
+  assert.deepEqual([c2.x, c2.y, c2.z], [-38.5, 66.9, 18.6]);
+
+  const c3 = parseCoords('X: 500 Y: 72 Z: -300');
+  assert.deepEqual([c3.x, c3.y, c3.z], [500, 72, -300]);
+
+  assert.equal(parseCoords('collect wood logs 2'), null);
+  assert.equal(parseCoords('make 3 stone pickaxes'), null);
+  assert.equal(parseCoords('hello world'), null);
+});
+
+test('come_to_owner: travels to coordinates even when owner is out of view', async () => {
+  const bot = new FakeBot();
+  const token = new CancelToken();
+  const ctx = { ownerName: 'Alice' };
+
+  // Owner entity is null (far away outside tracking distance)
+  bot.players = { Alice: { entity: null } };
+  bot._lastOwnerPos = new Vec3(200, 64, 50);
+  bot._lastOwnerPosTime = Date.now();
+
+  assert.equal(skills.come_to_owner.isAvailable(bot, ctx).ok, true);
+
+  const targets = [];
+  bot.pathfinder.goto = async (goal) => {
+    targets.push(goal);
+    // Simulate arriving at goal
+    bot.entity.position = new Vec3(goal.x, goal.y ?? 64, goal.z);
+  };
+
+  const res = await skills.come_to_owner.run(bot, ctx, token);
+  assert.equal(res.ok, true);
+  assert.equal(res.message, 'reached owner');
+  assert.ok(bot.entity.position.distanceTo(new Vec3(200, 64, 50)) <= 3);
+});
+
+test('queryOwnerPos: queries server via /data get entity and resolves coordinates', async () => {
+  const { queryOwnerPos } = require('../src/state/world');
+  const bot = new FakeBot();
+
+  bot.on('chatSent', (msg) => {
+    if (msg.startsWith('/data get entity Alice Pos')) {
+      process.nextTick(() => {
+        bot.emit('message', 'Alice has the following entity data: [150.5d, 70.0d, -80.25d]');
+      });
+    }
+  });
+
+  const pos = await queryOwnerPos(bot, 'Alice', 1000);
+  assert.ok(pos);
+  assert.equal(pos.x, 150.5);
+  assert.equal(pos.y, 70);
+  assert.equal(pos.z, -80.25);
+  assert.equal(bot._lastOwnerPos.x, 150.5);
+});
+

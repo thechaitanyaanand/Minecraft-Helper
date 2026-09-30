@@ -46,7 +46,7 @@ async function run() {
   const lines = fs.readFileSync(fixturePath, 'utf8').trim().split('\n').filter(Boolean);
   const items = lines.map((l) => JSON.parse(l));
 
-  const bot = new FakeBot('Helper');
+  const bot = new FakeBot('Butler');
   const ctx = { ownerName: 'Steve', currentGoal: 'none', currentStep: 'none', lastStepResult: 'none', autopilot: false };
 
   console.log(`\n======================================================`);

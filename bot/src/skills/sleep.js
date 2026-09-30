@@ -3,7 +3,7 @@ const { Vec3 } = require('vec3');
 const { goals } = require('mineflayer-pathfinder');
 const { travelToOwner } = require('./owner');
 
-// Sleep alongside the owner. The helper counts as a player, so the night only skips if it sleeps too.
+// Sleep alongside the owner. The butler counts as a player, so the night only skips if it sleeps too.
 // Uses a free bed nearby, else places the bed from its kit and picks it back up in the morning.
 
 let ownerAsleep = false;

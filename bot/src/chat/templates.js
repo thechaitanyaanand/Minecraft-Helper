@@ -42,17 +42,26 @@ const templates = {
     if (goalId === 'survive_night') return 'Morning! Safe to head out.';
     if (goalId === 'go_home') return 'Home sweet home!';
     if (goalId === 'sleep_with_owner') return 'Good morning!';
+    if (goalId === 'deep_mine') return 'Diamond expedition complete!';
+    if (goalId === 'enter_nether') return 'Welcome to the Nether!';
+    if (goalId === 'get_blaze_rods') return 'Blaze rods secured!';
+    if (goalId === 'gather_ender_pearls') return 'Ender pearls collected!';
+    if (goalId === 'craft_eyes_of_ender') return 'Eyes of ender crafted!';
+    if (goalId === 'find_stronghold') return 'Stronghold located!';
+    if (goalId === 'activate_end_portal') return 'End Portal activated!';
+    if (goalId === 'defeat_ender_dragon' || goalId === 'beat_game') return 'The Ender Dragon is slain! Victory!';
     if (goalId.startsWith('goto:')) return 'Here we are!';
+    if (goalId === 'explore') return 'Finished scouting!';
     if (['come_here', 'follow_me', 'give_items', 'recover_items'].includes(goalId)) return '';
     return `Done with ${goalLabel(goalId)}.`;
   },
 
   welcome(name) {
-    return `Hi ${name}! I'm your helper. Tell me what you want in normal words, starting with "helper". Try: "helper get wood", "helper make a pickaxe", "helper play for me". Type !stop to stop me, !help for more.`;
+    return `Hi ${name}! I'm your butler. Tell me what you want in normal words, starting with "butler". Try: "butler get wood", "butler make a pickaxe", "butler play for me". Type !stop to stop me, !help for more.`;
   },
 
   help() {
-    return 'Commands: !stop, !come, !follow, !give, !status, !auto, !why, !kit, !sethome, !home, !stuff (fetch your items after dying), !where (home, chests, death spot). Or just talk: "helper get wood".';
+    return 'Commands: /plan (roadmap), /boost (gear up), /goal <name>, !stop, !come, !follow, !give, !status, !auto, !why, !kit, !home, !stuff, !where. Or talk: "butler get wood".';
   },
 
   status({ health = 20, food = 20, timeOfDay = 'day', activity = 'idle', backend = 'mock' } = {}) {
@@ -75,7 +84,7 @@ const templates = {
   },
 
   unclear() {
-    return 'I didn\'t understand that. Try "helper get wood", "helper make a pickaxe", or type !help.';
+    return 'I didn\'t understand that. Try "butler get wood", "butler make a pickaxe", or type !help.';
   },
 
   announceGoal(goalId, learn = false) {
@@ -100,13 +109,48 @@ const templates = {
       go_home: 'Heading home.',
       sleep_with_owner: 'Bedtime? Coming to sleep too!',
       recover_items: 'Going to fetch your stuff from where you died!',
+      explore: '',
       autopilot: 'Autopilot enabled! Surviving and gathering resources.',
+      deep_mine: 'Descending deep underground to Y=-58 to mine diamonds!',
+      enter_nether: 'Building and igniting a Nether portal to enter the Nether!',
+      get_blaze_rods: 'Navigating the Nether to find a fortress and harvest blaze rods!',
+      gather_ender_pearls: 'Bartering with Piglins and hunting Endermen for ender pearls!',
+      craft_eyes_of_ender: 'Crafting eyes of ender to locate the Stronghold!',
+      find_stronghold: 'Throwing eyes of ender to triangulate the Stronghold!',
+      activate_end_portal: 'Entering the Stronghold, clearing silverfish, and filling the End portal!',
+      defeat_ender_dragon: 'Entering the End to destroy crystals and slay the Ender Dragon!',
+      beat_game: 'Starting the journey to defeat the Ender Dragon and beat Minecraft!',
     };
     return map[goalId] ?? `On it: ${goalLabel(goalId)}.`;
   },
 
   stepStart(skill, args = {}, learn = false) {
     switch (skill) {
+      case 'deep_mine':
+      case 'mine_diamonds':
+        return `Mining down to Y=-58 and strip mining for diamonds (target: ${args.count || 3})...`;
+      case 'build_portal':
+      case 'build_nether_portal':
+        return 'Constructing 4x5 obsidian portal frame and lighting it...';
+      case 'enter_portal':
+        return 'Walking into portal to transition dimensions...';
+      case 'find_fortress':
+        return 'Exploring the Nether looking for a nether fortress...';
+      case 'hunt_blaze':
+        return `Fighting blazes behind shield to gather blaze rods (target: ${args.count || 6})...`;
+      case 'barter_piglin':
+        return `Bartering gold ingots with Piglins for ender pearls (target: ${args.count || 12})...`;
+      case 'hunt_enderman':
+        return 'Hunting Endermen under a safe 2-block ceiling...';
+      case 'triangulate_stronghold':
+        return 'Throwing eyes of ender to triangulate stronghold coordinates...';
+      case 'find_stronghold':
+        return 'Traveling to stronghold coordinates and digging down safely...';
+      case 'activate_end_portal':
+        return 'Clearing silverfish and inserting eyes of ender into frames...';
+      case 'fight_dragon':
+      case 'defeat_dragon':
+        return 'Fighting the Ender Dragon: destroying crystals and striking when perched!';
       case 'collect_logs':
         return learn
           ? 'Chopping trees. Punch trees with bare hands or an axe to gather logs!'

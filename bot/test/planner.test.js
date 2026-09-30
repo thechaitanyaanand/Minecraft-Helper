@@ -157,3 +157,26 @@ test('createPlanner: with materials in hand and a table nearby, crafts straight 
   assert.match(messages[0], /already have the materials/);
   planner.stop();
 });
+
+test('createPlanner: explore goal runs explore skill and completes cleanly', async () => {
+  const FakeBot = require('./fakeBot');
+  const { Vec3 } = require('vec3');
+  const bot = new FakeBot();
+  bot.entity = { position: new Vec3(0, 64, 0) };
+  bot.pathfinder = {
+    setGoal: (g) => { if (g) bot.entity.position = bot.entity.position.offset(30, 0, 0); },
+    stop: () => {},
+    isMoving: () => false,
+    setMovements: () => {},
+  };
+  const messages = [];
+  const decider = { decide: async () => ({ answers: {} }), status: () => ({ backend: 'mock' }) };
+  const planner = createPlanner(bot, decider, { ownerName: 'owner' }, (m) => messages.push(m));
+  planner.startGoal('explore');
+  for (let i = 0; i < 50 && planner.getState().mode !== 'idle'; i++) await new Promise((r) => setTimeout(r, 20));
+  assert.equal(planner.getState().mode, 'idle');
+  assert.ok(!messages.some((m) => m.includes('Unknown goal')), 'must not report Unknown goal');
+  assert.ok(messages.includes('Finished scouting!'));
+  planner.stop();
+});
+

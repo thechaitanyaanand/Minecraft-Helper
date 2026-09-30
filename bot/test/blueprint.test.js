@@ -57,7 +57,7 @@ test('shortlist: parseAmount extracts counts', () => {
 });
 
 test('shortlist: parseDirectTarget extracts items, mobs, and blueprints', () => {
-  assert.equal(parseDirectTarget('helper lakdi chahiye', mcData), 'oak_log');
+  assert.equal(parseDirectTarget('butler lakdi chahiye', mcData), 'oak_log');
   assert.equal(parseDirectTarget('make an iron pickaxe', mcData), 'iron_pickaxe');
   assert.equal(parseDirectTarget('khana do', mcData), 'cooked_beef');
   assert.equal(parseDirectTarget('i need torches', mcData), 'torch');

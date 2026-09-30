@@ -33,7 +33,7 @@ if (backend === 'jev' && (!jevBaseUrl || !jevApiKey)) {
   throw new Error('Config error: JEV_BASE_URL and JEV_API_KEY are required when DECISION_BACKEND is jev');
 }
 
-const prefixes = (process.env.CHAT_PREFIXES || 'helper,!,@helper')
+const prefixes = (process.env.CHAT_PREFIXES || 'butler,!,@butler')
   .split(',')
   .map(p => p.trim())
   .filter(Boolean);
@@ -43,7 +43,7 @@ const config = Object.freeze({
     host: process.env.MC_HOST || '127.0.0.1',
     port: parseNumber(process.env.MC_PORT, 25565, 'MC_PORT'),
     version: process.env.MC_VERSION || '1.20.4',
-    username: process.env.BOT_USERNAME || 'Helper',
+    username: process.env.BOT_USERNAME || 'Butler',
   }),
   ownerName,
   autoKit: process.env.AUTO_KIT !== 'false',

@@ -9,7 +9,7 @@ function stubBot() {
   const pos = new Vec3(10.4, 64, -3.6);
   const me = { position: pos, yaw: 0 };
   return {
-    username: 'Helper', health: 17, food: 9, time: { timeOfDay: 14000 },
+    username: 'Butler', health: 17, food: 9, time: { timeOfDay: 14000 },
     entity: me, heldItem: { name: 'wooden_pickaxe' },
     inventory: { items: () => [{ name: 'oak_log', count: 3 }, { name: 'oak_log', count: 2 }, { name: 'wooden_pickaxe', count: 1 }] },
     entities: {
@@ -42,7 +42,7 @@ test('live view serves the page and replays state to new viewers', async () => {
   try {
     const page = await fetch(base + '/');
     assert.strictEqual(page.status, 200);
-    assert.match(await page.text(), /<title>Helper/);
+    assert.match(await page.text(), /<title>Butler/);
 
     publish('snapshot', { online: true, health: 20 });
     publish('decision', { backend: 'local', answers: { intent: { type: 'choice', choice: 'get_wood' } } });

@@ -126,11 +126,11 @@ test('buddy: getLegalActions correctly filters legal companion actions', () => {
   legal = buddy.getLegalActions({ recent: { broke: { stone: 5 } } }, 20, {}, 'day', 'none');
   assert.ok(legal.includes('gather_same'));
 
-  // Owner placed planks and helper has planks -> bring_materials
+  // Owner placed planks and butler has planks -> bring_materials
   legal = buddy.getLegalActions({ recent: { placed: { oak_planks: 4 } } }, 20, { oak_planks: 16 }, 'day', 'none');
   assert.ok(legal.includes('bring_materials'));
 
-  // Helper has food and owner hurt -> give_food
+  // Butler has food and owner hurt -> give_food
   legal = buddy.getLegalActions({ recent: { hurt: 1 }, health: 14 }, 20, { cooked_beef: 5 }, 'day', 'none');
   assert.ok(legal.includes('give_food'));
 

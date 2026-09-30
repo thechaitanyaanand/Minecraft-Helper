@@ -27,7 +27,14 @@ const fmt = (p) => `${p.x} ${p.y} ${p.z}`;
 
 module.exports = {
   get: load,
-  set(key, pos) { load()[key] = pos ? round(pos) : null; save(); },
+  set(key, val) {
+    if (val && typeof val === 'object' && 'x' in val) {
+      load()[key] = round(val);
+    } else {
+      load()[key] = val ?? null;
+    }
+    save();
+  },
   addChest(pos) {
     const d = load(), p = round(pos);
     if (d.chests.some((c) => same(c, p))) return;
@@ -59,7 +66,7 @@ module.exports = {
   },
   describe() {
     const d = load(), parts = [];
-    parts.push(d.home ? `Home: ${fmt(d.home)}` : 'No home set (say "helper set home")');
+    parts.push(d.home ? `Home: ${fmt(d.home)}` : 'No home set (say "butler set home")');
     if (d.deathSpot) parts.push(`You last died at ${fmt(d.deathSpot)}`);
     if (d.chests.length) parts.push(`Chests: ${d.chests.slice(-5).map(fmt).join(', ')}`);
     return `${parts.join('. ')}.`;

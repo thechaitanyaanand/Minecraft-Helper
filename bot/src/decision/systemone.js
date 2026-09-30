@@ -16,7 +16,7 @@ function createSystemOneClient(opts) {
   if (!opts || !opts.baseUrl) throw new Error('systemone: baseUrl required');
   const url = opts.baseUrl.replace(/\/+$/, '') + '/v1/systemone';
 
-  return async function call(state, questions) {
+  return async function call(state, questions, callOpts = {}) {
     const headers = { 'content-type': 'application/json' };
     if (opts.apiKey) {
       const h = opts.authHeader || 'Authorization';
@@ -25,7 +25,9 @@ function createSystemOneClient(opts) {
     const body = { state, questions, independent: true };
     if (opts.model) body.model = opts.model;
 
-    const timeoutMs = Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : 4000;
+    const timeoutMs = Number.isFinite(callOpts?.timeoutMs)
+      ? callOpts.timeoutMs
+      : (Number.isFinite(opts.timeoutMs) ? opts.timeoutMs : 4000);
     let res;
     try {
       res = await fetch(url, {

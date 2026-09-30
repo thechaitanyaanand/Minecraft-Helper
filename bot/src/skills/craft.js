@@ -6,12 +6,29 @@ const PLANK_TYPES = Object.freeze([
   'acacia_planks', 'dark_oak_planks', 'mangrove_planks', 'cherry_planks',
 ]);
 
+async function clearPlayerCraftingGrid(bot) {
+  if (!bot?.inventory?.slots) return;
+  if (bot.inventory.selectedItem) {
+    const emptySlot = bot.inventory.firstEmptySlotRange?.(bot.inventory.inventoryStart, bot.inventory.inventoryEnd);
+    if (emptySlot !== null && emptySlot !== undefined && bot.clickWindow) {
+      try { await bot.clickWindow(emptySlot, 0, 0); } catch (_) {}
+    }
+  }
+  for (let s = 1; s <= 4; s++) {
+    if (bot.inventory.slots[s] && bot.putAway) {
+      try { await bot.putAway(s); } catch (_) {}
+    }
+  }
+}
+
 module.exports = {
   name: 'craft',
   describe: 'craft items using inventory or a crafting table',
   timeoutMs: 25_000,
 
   async run(bot, ctx, token, args = {}) {
+    token.throwIfCancelled();
+    await clearPlayerCraftingGrid(bot);
     token.throwIfCancelled();
     const mcData = require('minecraft-data')(bot?.version || '1.20.4');
     let itemName = args.item || 'oak_planks';

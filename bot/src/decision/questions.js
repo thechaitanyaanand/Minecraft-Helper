@@ -7,14 +7,14 @@ const INTENT_CRITERIA = Object.freeze({
   survive_night: 'stay safe at night or hide from monsters',
   follow_me: 'follow the player around',
   come_here: 'walk to where the player is',
-  give_items: 'give the player items the helper has',
+  give_items: 'give the player items the butler has',
   autopilot: 'play by itself and decide what to do next',
-  explain: 'player asks a question about Minecraft or the helper, no action',
+  explain: 'player asks a question about Minecraft or the butler, no action',
   chat: 'small talk: greeting, thanks, joke, feelings or a reaction',
-  remember: 'player asks the helper to remember or forget something',
+  remember: 'player asks the butler to remember or forget something',
   go_place: 'go to a named or remembered place like home, the base or a farm',
-  stop: 'stop what the helper is doing',
-  status: 'player asks what the helper is doing or has',
+  stop: 'stop what the butler is doing',
+  status: 'player asks what the butler is doing or has',
   unclear: 'message is not a request or is unclear',
 });
 
@@ -85,13 +85,13 @@ function buildIntentQuestions() {
   return {
     intent: {
       type: 'choice',
-      instructions: 'A new Minecraft player typed player_message to their helper. What do they want?',
+      instructions: 'A new Minecraft player typed player_message to their butler. What do they want?',
       criteria: { ...INTENT_CRITERIA },
     },
     wants_to_learn: {
       type: 'noul',
       instructions: 'Does the player want to learn how to do it themselves?',
-      criteria: { true: 'player asks how to do it or wants to learn', false: 'player wants the helper to do the task' },
+      criteria: { true: 'player asks how to do it or wants to learn', false: 'player wants the butler to do the task' },
     },
   };
 }
@@ -101,7 +101,7 @@ function buildInterruptQuestions(legalOptions) {
   const options = Array.isArray(legalOptions) ? legalOptions : Object.keys(INTERRUPT_CRITERIA);
   for (const opt of options) if (INTERRUPT_CRITERIA[opt]) criteria[opt] = INTERRUPT_CRITERIA[opt];
   if (Object.keys(criteria).length < 2) return null;
-  return { interrupt: { type: 'choice', instructions: 'Should the helper interrupt its current task?', criteria } };
+  return { interrupt: { type: 'choice', instructions: 'Should the butler interrupt its current task?', criteria } };
 }
 
 function buildNextGoalQuestions(availableGoals) {
@@ -121,7 +121,7 @@ function buildBuddyQuestions(legalActions) {
     needs_help: { type: 'noul', instructions: 'Does this new player look like they are struggling?', criteria: { true: 'player is in danger or needs help', false: 'player is doing fine' } },
   };
   if (Object.keys(criteria).length >= 2) {
-    q.buddy_action = { type: 'choice', instructions: 'How should the helper help the player now?', criteria };
+    q.buddy_action = { type: 'choice', instructions: 'How should the butler help the player now?', criteria };
   }
   return q;
 }

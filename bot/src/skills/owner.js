@@ -1,13 +1,17 @@
 'use strict';
 const { Vec3 } = require('vec3');
 const { goals } = require('mineflayer-pathfinder');
-const { ownerEntity, bestToolTier } = require('../state/world');
+const { ownerEntity, isOwnerKnown, resolveOwnerPos, bestToolTier } = require('../state/world');
 const { travel } = require('./travel');
 
-// Walks to the owner, following them if they move; keeps heading to their last seen spot if they go out of view.
-function travelToOwner(bot, ctx, token) {
-  let last = null;
-  return travel(bot, () => (last = ownerEntity(bot, ctx?.ownerName)?.position || last), token, 2);
+// Walks to the owner, following them if they move; keeps heading to their last seen/queried spot if they go out of view.
+async function travelToOwner(bot, ctx, token) {
+  let last = bot._lastOwnerPos || null;
+  return travel(bot, async () => {
+    const p = await resolveOwnerPos(bot, ctx?.ownerName);
+    if (p) last = p;
+    return last;
+  }, token, 2);
 }
 
 const SCAFFOLD_NAMES = new Set(['dirt', 'grass_block', 'cobblestone', 'stone', 'cobbled_deepslate', 'oak_planks', 'sand', 'gravel']);
@@ -59,14 +63,14 @@ async function gatherScaffoldIfTrapped(bot, neededCount = 3) {
 const comeToOwner = {
   name: 'come_to_owner',
   describe: 'walk to the owner',
-  timeoutMs: 60_000,
+  timeoutMs: 180_000,
   isAvailable(bot, ctx) {
-    return ownerEntity(bot, ctx?.ownerName) ? { ok: true } : { ok: false, reason: 'owner_not_found' };
+    return isOwnerKnown(bot, ctx?.ownerName) ? { ok: true } : { ok: false, reason: 'owner_not_found' };
   },
   async run(bot, ctx, token) {
     token.throwIfCancelled();
-    const owner = ownerEntity(bot, ctx?.ownerName);
-    if (!owner) return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby' };
+    const pos = await resolveOwnerPos(bot, ctx?.ownerName);
+    if (!pos) return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby and coordinates unknown' };
 
     token.throwIfCancelled();
     const res = await travelToOwner(bot, ctx, token);
@@ -80,32 +84,70 @@ const followOwner = {
   describe: 'follow the owner until cancelled',
   timeoutMs: 0,
   isAvailable(bot, ctx) {
-    return ownerEntity(bot, ctx?.ownerName) ? { ok: true } : { ok: false, reason: 'owner_not_found' };
+    return isOwnerKnown(bot, ctx?.ownerName) ? { ok: true } : { ok: false, reason: 'owner_not_found' };
   },
   async run(bot, ctx, token) {
     token.throwIfCancelled();
-    const owner = ownerEntity(bot, ctx?.ownerName);
-    if (!owner) return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby' };
-
-    token.throwIfCancelled();
-    if (bot.pathfinder?.setGoal) {
-      bot.pathfinder.setGoal(new goals.GoalFollow(owner, 2), true);
+    const ownerName = ctx?.ownerName;
+    if (!isOwnerKnown(bot, ownerName)) {
+      return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby' };
     }
 
+    token.throwIfCancelled();
+
     return new Promise((resolve) => {
-      const onCancel = () => {
+      let active = true;
+      let followingEntity = false;
+
+      const cleanup = () => {
+        active = false;
         try {
           if (bot.pathfinder?.stop) bot.pathfinder.stop();
           if (bot.pathfinder?.setGoal) bot.pathfinder.setGoal(null);
         } catch (_) {}
+      };
+
+      const onCancel = () => {
+        cleanup();
         resolve({ ok: true, message: 'stopped following' });
       };
 
       if (token.cancelled) {
         onCancel();
-      } else {
-        token.onCancel(onCancel);
+        return;
       }
+      token.onCancel(onCancel);
+
+      (async () => {
+        while (active && !token.cancelled) {
+          const owner = ownerEntity(bot, ownerName);
+          if (owner) {
+            if (!followingEntity) {
+              followingEntity = true;
+              if (bot.pathfinder?.setGoal) {
+                bot.pathfinder.setGoal(new goals.GoalFollow(owner, 2), true);
+              }
+            }
+            await new Promise((r) => setTimeout(r, 1000));
+          } else {
+            followingEntity = false;
+            try {
+              if (bot.pathfinder?.stop) bot.pathfinder.stop();
+            } catch (_) {}
+
+            const res = await travelToOwner(bot, ctx, token);
+            if (token.cancelled || !active) break;
+            if (!res.ok) {
+              await new Promise((r) => setTimeout(r, 2000));
+            }
+          }
+        }
+        cleanup();
+        resolve({ ok: true, message: 'stopped following' });
+      })().catch((err) => {
+        cleanup();
+        resolve({ ok: false, reason: 'error', message: err.message });
+      });
     });
   },
 };
@@ -113,23 +155,24 @@ const followOwner = {
 const giveToOwner = {
   name: 'give_to_owner',
   describe: 'walk to owner and toss inventory items',
-  timeoutMs: 90_000, // walking back from a far gathering spot plus tossing
+  timeoutMs: 180_000, // walking back from a far gathering spot plus tossing
   isAvailable(bot, ctx) {
-    if (!ownerEntity(bot, ctx?.ownerName)) return { ok: false, reason: 'owner_not_found' };
+    if (!isOwnerKnown(bot, ctx?.ownerName)) return { ok: false, reason: 'owner_not_found' };
     const items = bot.inventory?.items ? bot.inventory.items() : [];
     return items.length > 0 ? { ok: true } : { ok: false, reason: 'no_items' };
   },
   async run(bot, ctx, token, args = {}) {
     token.throwIfCancelled();
-    const owner = ownerEntity(bot, ctx?.ownerName);
-    if (!owner) return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby' };
+    const pos = await resolveOwnerPos(bot, ctx?.ownerName);
+    if (!pos) return { ok: false, reason: 'owner_not_found', message: 'Owner is not visible nearby' };
 
     token.throwIfCancelled();
     const trip = await travelToOwner(bot, ctx, token);
     if (!trip.ok) return trip; // never toss items somewhere the owner isn't
     token.throwIfCancelled();
 
-    if (bot.lookAt && owner.position) {
+    const owner = ownerEntity(bot, ctx?.ownerName);
+    if (bot.lookAt && owner?.position) {
       try { await bot.lookAt(owner.position.offset(0, owner.height ? owner.height * 0.8 : 1.6, 0)); } catch (_) {}
     }
 

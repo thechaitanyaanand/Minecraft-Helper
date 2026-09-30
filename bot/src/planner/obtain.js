@@ -3,11 +3,12 @@ const mcData = require('minecraft-data')('1.20.4');
 const { SMELTING } = require('./smelting');
 const { FOOD_MOBS } = require('../state/world');
 
-const UNSUPPORTED = new Set(['bread', 'wheat', 'blaze_rod', 'blaze_powder', 'ender_eye', 'ender_pearl', 'nether_star', 'elytra', 'shulker_box', 'totem_of_undying', 'saddle']);
+const UNSUPPORTED = new Set(['bread', 'wheat', 'nether_star', 'elytra', 'shulker_box', 'totem_of_undying', 'saddle']);
 const MOB_DROPS = Object.freeze({
   beef: ['cow', 'mooshroom'], porkchop: ['pig'], chicken: ['chicken'], mutton: ['sheep'], rabbit: ['rabbit'],
   leather: ['cow', 'mooshroom'], white_wool: ['sheep'], feather: ['chicken'], string: ['spider'], spider_eye: ['spider'],
   bone: ['skeleton'], gunpowder: ['creeper'], rotten_flesh: ['zombie'],
+  blaze_rod: ['blaze'], ender_pearl: ['enderman'],
 });
 const FOOD_ITEMS = new Set(['cooked_beef', 'cooked_porkchop', 'cooked_chicken', 'cooked_mutton', 'cooked_rabbit', 'bread', 'apple', 'carrot', 'baked_potato', 'beef', 'porkchop', 'chicken', 'mutton', 'rabbit']);
 const LOG_BLOCKS = mcData.blocksArray.map((b) => b.name).filter((n) => n.endsWith('_log') && !n.startsWith('stripped_'));
@@ -25,6 +26,8 @@ for (const b of mcData.blocksArray) {
     }
   }
 }
+BLOCK_DROPS['flint'] = ['gravel'];
+BLOCK_DROPS['obsidian'] = ['obsidian'];
 
 // What you get from breaking a block (stone -> cobblestone, iron_ore -> raw_iron).
 function dropOf(blockName) {
@@ -88,7 +91,7 @@ function plan(target, n = 1, inv = {}, depth = 0, seen = new Set()) {
   const normTarget = resolveGroup(target);
   const have = getHave(inv, target);
   if (have >= n) return [];
-  if (depth > 8 || seen.has(normTarget)) return { fail: 'too_deep' };
+  if (depth > 14 || seen.has(normTarget)) return { fail: 'too_deep' };
   if (UNSUPPORTED.has(normTarget)) return { fail: normTarget === 'bread' ? 'no_source' : 'not_yet' };
 
   const needed = n - have, nextSeen = new Set(seen);

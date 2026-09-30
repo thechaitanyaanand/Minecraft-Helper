@@ -137,9 +137,57 @@ test('createDecider: slot questions resolve verb and category correctly', async 
   const cfg = { decision: { backend: 'mock', timeoutMs: 1000 } };
   const decider = createDecider(cfg);
   const q = questions.slots();
-  const res = await decider.decide({ player_message: 'helper get 10 oak planks' }, q);
+  const res = await decider.decide({ player_message: 'butler get 10 oak planks' }, q);
 
   assert.equal(res.answers.verb.choice, 'obtain');
   assert.equal(res.answers.category.choice, 'wood');
 });
+
+test('createDecider: background calls drop when in flight, player requests wait and succeed', async () => {
+  let inFlightCount = 0;
+  let maxInFlight = 0;
+  const slowClient = async () => {
+    inFlightCount++;
+    if (inFlightCount > maxInFlight) maxInFlight = inFlightCount;
+    await new Promise((r) => setTimeout(r, 50));
+    inFlightCount--;
+    return {
+      ...fixture,
+      answers: {
+        ...fixture.answers,
+        wants_to_learn: { type: 'noul', noul: 0.1 },
+      },
+    };
+  };
+
+  const cfg = {
+    decision: {
+      backend: 'local',
+      timeoutMs: 1000,
+      local: { baseUrl: 'http://127.0.0.1:8000' },
+    },
+  };
+
+  const decider = createDecider(cfg, { client: slowClient });
+  const q = questions.intent();
+
+  // Launch a background request and a concurrent second background request
+  const p1 = decider.decide({ player_message: 'i need wood' }, q, { purpose: 'interrupt' });
+  const p2 = decider.decide({ player_message: 'i need wood' }, q, { purpose: 'buddy' });
+
+  // And a player request that arrives while p1 is running
+  const p3 = decider.decide({ player_message: 'i need wood' }, q, { purpose: 'intent' });
+
+  const [r1, r2, r3] = await Promise.all([p1, p2, p3]);
+
+  // p1 was executed
+  assert.equal(r1.fallback, false);
+  // p2 was dropped because p1 was in flight (preventing queue congestion)
+  assert.equal(r2.fallback, true);
+  // p3 waited for p1 and then executed cleanly
+  assert.equal(r3.fallback, false);
+  // max concurrent calls to client was strictly 1!
+  assert.equal(maxInFlight, 1);
+});
+
 

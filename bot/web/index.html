@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Helper — Live</title>
+<title>Butler — Live</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
@@ -150,13 +150,13 @@
 <body>
 <header>
   <span id="conn" class="conn wait">CONNECTING</span>
-  <div class="logo">HELPER<small>LIVE FROM YOUR WORLD</small><span class="splash" id="splash">Now with calibrated probabilities!</span></div>
+  <div class="logo">BUTLER<small>LIVE FROM YOUR WORLD</small><span class="splash" id="splash">Now with calibrated probabilities!</span></div>
 </header>
 
 <main>
   <!-- Vitals -->
   <section class="panel" aria-labelledby="h-vitals">
-    <h2 id="h-vitals">HELPER</h2>
+    <h2 id="h-vitals">BUTLER</h2>
     <div class="inset">
       <div id="hearts" class="bar-row" role="img" aria-label="Health"></div>
       <div id="hunger" class="bar-row" role="img" aria-label="Hunger"></div>
@@ -176,16 +176,16 @@
   <section class="panel span2" aria-labelledby="h-dec">
     <h2 id="h-dec">LATEST DECISION</h2>
     <div class="dark" id="decision">
-      <div class="empty"><div class="big">NO DECISIONS YET</div>Ask the helper something in game, e.g. <b>helper get wood</b>. Decisions appear here the moment they are made.</div>
+      <div class="empty"><div class="big">NO DECISIONS YET</div>Ask the butler something in game, e.g. <b>butler get wood</b>. Decisions appear here the moment they are made.</div>
     </div>
   </section>
 
   <!-- Minimap -->
   <section class="panel" aria-labelledby="h-map">
     <h2 id="h-map">MAP</h2>
-    <div class="map-wrap"><canvas id="map" width="250" height="250" aria-label="Top-down map around the helper"></canvas></div>
+    <div class="map-wrap"><canvas id="map" width="250" height="250" aria-label="Top-down map around the butler"></canvas></div>
     <div class="legend">
-      <span><i style="background:#fff"></i>Helper</span><span><i style="background:#55ffff"></i>You</span>
+      <span><i style="background:#fff"></i>Butler</span><span><i style="background:#55ffff"></i>You</span>
       <span><i style="background:#5555ff"></i>Player</span><span><i style="background:#ff5555"></i>Hostile</span><span><i style="background:#ffaaff"></i>Animal</span>
     </div>
   </section>
@@ -351,7 +351,7 @@ function renderMap(map, entities, yaw) {
     g.fillStyle = '#000'; g.fillRect(x + 1, y + 1, cell - 2, cell - 2);
     g.fillStyle = dot[e.kind]; g.fillRect(x + 2, y + 2, cell - 4, cell - 4);
   }
-  // helper: white arrow pointing where it looks (mineflayer yaw 0 = facing -z / north)
+  // butler: white arrow pointing where it looks (mineflayer yaw 0 = facing -z / north)
   const cx = (mid + .5) * cell, cy = (mid + .5) * cell;
   g.save(); g.translate(cx, cy); g.rotate(-yaw);
   g.fillStyle = '#000'; g.beginPath(); g.moveTo(0, -cell); g.lineTo(cell * .75, cell * .8); g.lineTo(-cell * .75, cell * .8); g.fill();
@@ -427,13 +427,13 @@ function connect() {
   });
   es.addEventListener('event', (e) => {
     const ev = JSON.parse(e.data);
-    const text = ev.kind === 'intent' ? `→ helper heard: "${ev.text}"` : ev.text;
+    const text = ev.kind === 'intent' ? `→ butler heard: "${ev.text}"` : ev.text;
     chatLine(EVENT_CLASS[ev.kind] || 'ev', `<time>${hhmm()}</time>${esc(text)}`);
   });
   es.addEventListener('error', () => { const c = $('conn'); c.className = 'conn wait'; c.textContent = 'RECONNECTING'; });
 }
 
-const SPLASHES = ['Now with calibrated probabilities!', 'Punch trees!', 'System one, not system two!', 'Also try: helper get wood', 'Does not write poems!', '100% local!', 'Mind the creepers!'];
+const SPLASHES = ['Now with calibrated probabilities!', 'Punch trees!', 'System one, not system two!', 'Also try: butler get wood', 'Does not write poems!', '100% local!', 'Mind the creepers!'];
 $('splash').textContent = SPLASHES[Math.floor(Math.random() * SPLASHES.length)];
 renderInventory([], null);
 bar($('hearts'), 0, HEART, HEART_HALF, '#e0241b', 'Health');

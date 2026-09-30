@@ -4,20 +4,24 @@ const { goals } = require('mineflayer-pathfinder');
 // pathfinder.goto() rejects with "Took to long to decide path to goal!" once planning passes thinkTimeout (5 s),
 // which long or twisty trips hit even though a usable partial route exists. So travel in hops: plan HOP blocks
 // toward the target (quick to plan), walk it, repeat. The target is re-read every hop, so a moving owner is followed.
-const HOP = 32, MAX_HOPS = 40, MAX_FAILS = 3;
+const HOP = 32, MAX_HOPS = 100, MAX_FAILS = 3;
 
 /**
- * @param {() => ({x,y,z}|null)} getTarget - current target position (re-read each hop)
+ * @param {(() => ({x,y,z}|null)) | (() => Promise<{x,y,z}|null>)} getTarget - current target position (re-read each hop)
+ * @param {object} token - CancelToken
  * @param {number} range - how close counts as arrived (horizontal blocks)
  * @returns {Promise<{ok: boolean, reason?: string, message?: string}>}
  */
 async function travel(bot, getTarget, token, range = 2) {
   let fails = 0, lastError = '';
-  for (let hop = 0; hop < MAX_HOPS; hop++) {
+  let totalHops = MAX_HOPS;
+  for (let hop = 0; hop < totalHops; hop++) {
     token?.throwIfCancelled?.();
-    const t = getTarget(), p = bot.entity?.position;
+    const t = typeof getTarget === 'function' ? await getTarget() : getTarget;
+    const p = bot.entity?.position;
     if (!t || !p) return { ok: false, reason: 'no_target' };
     const dx = t.x - p.x, dz = t.z - p.z, dist = Math.hypot(dx, dz);
+    if (hop === 0) totalHops = Math.max(MAX_HOPS, Math.ceil(dist / HOP) + 20);
     if (dist <= range + 1 && Math.abs(t.y - p.y) < 4) return { ok: true };
 
     // Each failure plans a shorter hop; a failing last leg settles for standing near the target at any height
